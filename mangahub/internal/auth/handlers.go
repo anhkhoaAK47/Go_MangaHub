@@ -19,6 +19,11 @@ type AuthRequest struct {
 	Email	 string `json:"email" binding:"required"`
 }
 
+type LoginRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
 func HandleRegister(c *gin.Context, db *sql.DB) {
 	var req AuthRequest
 	// validate input
@@ -42,6 +47,7 @@ func HandleRegister(c *gin.Context, db *sql.DB) {
 			"error": "Password too weak",
 			"suggestion": "Password must be at least 8 characters with mixed case and numbers",
 		})
+		return
 	}
 
 	// Hash password
@@ -69,13 +75,14 @@ func HandleRegister(c *gin.Context, db *sql.DB) {
 		}
 
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Server error",
+			"error": err.Error(),
 		})
 		return
 	}
 		
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Account created successfully!",
+		"username": req.Username,
 		"user_id": userID,
 		"email": req.Email,
 		"created_at": time.Now().UTC(),
@@ -84,10 +91,10 @@ func HandleRegister(c *gin.Context, db *sql.DB) {
 }
 
 func HandleLogin(c *gin.Context, db *sql.DB, jwtSecret string) {
-	var req AuthRequest
+	var req LoginRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -100,8 +107,9 @@ func HandleLogin(c *gin.Context, db *sql.DB, jwtSecret string) {
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "Login failed: Account not found",
-			"suggestion": "Try: mangahub auth register --username " + req.Username + " --email" + req.Email,
+			"suggestion": "Try: mangahub auth register --username " + req.Username,
 		})
+		return
 	} else if err != nil { 
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Login failed: Server connection error",
@@ -118,14 +126,16 @@ func HandleLogin(c *gin.Context, db *sql.DB, jwtSecret string) {
 			"error": "Login failed: Invalid credentials",
 			"suggestion": "Check your username and password",
 		})
+		return
 	}
 
 	// Generate token
 	token, err := utils.GenerateJWT(userID, jwtSecret)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to create session",
+			"error": err.Error(),
 		})
+		return
 	}
 
 	// OK Status

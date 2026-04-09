@@ -22,7 +22,7 @@ func NewAPIServer(datapath string, jwtSecret string) *routes.APIServer {
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
-	defer db.Close()
+
 
 	server := &routes.APIServer{
 		Router: gin.Default(),

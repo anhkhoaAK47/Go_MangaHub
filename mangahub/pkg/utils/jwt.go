@@ -10,8 +10,8 @@ import (
 
 
 func GenerateJWT(userID string, secret string) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
-		"user_id": userID,
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"id": userID,
 		"exp": time.Now().Add(time.Hour * 24).Unix(),
 	})
 
