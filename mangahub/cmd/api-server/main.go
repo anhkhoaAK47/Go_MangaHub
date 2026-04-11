@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"go_mangahub/mangahub/pkg/database"
 	"go_mangahub/mangahub/internal/routes"
+	"go_mangahub/mangahub/internal/controllers"
+
 	"log"
 	"os"
 
@@ -23,6 +25,10 @@ func NewAPIServer(datapath string, jwtSecret string) *routes.APIServer {
 		log.Fatal("Failed to connect to database:", err)
 	}
 
+	err = database.SeedSampleManga(db)
+	if err != nil {
+		log.Println(err)
+	}
 
 	server := &routes.APIServer{
 		Router: gin.Default(),
@@ -30,16 +36,23 @@ func NewAPIServer(datapath string, jwtSecret string) *routes.APIServer {
 		JWTSecret: jwtSecret,
 	}
 
+	// Seed initial data
+	database.SeedSampleManga(db)
+
+	// Provide DB handle to controllers
+	controllers.SetDB(db)
+
 	routes.SetupRoutes(server)
 	
 	return server
 }
 
 func main() {
-	err := godotenv.Load("../.env")
+	err := godotenv.Load("")
 	if err != nil {
 		log.Println(err)
 	}
+
 
 	jwtSecret := os.Getenv("JWTSECRETKEY")
 	server := NewAPIServer("D:/DatabaseSQLite/mangahub.db", jwtSecret)

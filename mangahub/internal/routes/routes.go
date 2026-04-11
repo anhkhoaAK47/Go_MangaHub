@@ -4,9 +4,9 @@ import (
 	"database/sql"
 
 	"github.com/gin-gonic/gin"
-	// "go_mangahub/mangahub/internal/middleware"
-	"go_mangahub/mangahub/internal/controllers"
 	"go_mangahub/mangahub/internal/auth"
+	"go_mangahub/mangahub/internal/controllers"
+	"go_mangahub/mangahub/internal/middleware"
 )
 
 type APIServer struct {
@@ -30,14 +30,17 @@ func SetupRoutes(s *APIServer) {
 	// Manga routes (protected routes)
 	manga := s.Router.Group("/manga")
 	{
+		manga.Use(middleware.ValidateMiddleware(s.JWTSecret))
 
 		manga.GET("/", controllers.GetAllManga)
-		manga.GET("/:id",)
+		manga.GET("/:id", controllers.GetMangaInfo)
 	}
 
 	// Users routes (protected routes)
 	users := s.Router.Group("/users")
 	{
+		users.Use(middleware.ValidateMiddleware(s.JWTSecret))
+
 		users.POST("/library", )
 		users.GET("/library",)
 		users.PUT("/progress", )
