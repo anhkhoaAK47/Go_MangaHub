@@ -25,6 +25,10 @@ func SetupRoutes(s *APIServer) {
 		authGroup.POST("/login", func(c *gin.Context) {
 			auth.HandleLogin(c, s.Database, s.JWTSecret)
 		})
+		// requires token (protected route)
+		authGroup.GET("/check", middleware.ValidateMiddleware(s.JWTSecret),func(c *gin.Context) {
+			auth.CheckStatus(c, s.Database)
+		})
 	}
 
 	// Manga routes (protected routes)

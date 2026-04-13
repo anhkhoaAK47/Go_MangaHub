@@ -23,6 +23,14 @@ var loginCmd = &cobra.Command{
 	},
 }
 
+var statusCmd = &cobra.Command{
+	Use: "status",
+	Short: "Show current login status and user information",
+	Run: func(cmd *cobra.Command, args []string) {
+		
+	},
+}
+
 func init() {
 
 	// add login to auth command
