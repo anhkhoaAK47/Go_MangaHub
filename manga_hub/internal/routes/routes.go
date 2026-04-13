@@ -29,6 +29,10 @@ func SetupRoutes(s *APIServer) {
 		authGroup.GET("/check", middleware.ValidateMiddleware(s.JWTSecret),func(c *gin.Context) {
 			auth.CheckStatus(c, s.Database)
 		})
+		authGroup.POST("/change-password", middleware.ValidateMiddleware(s.JWTSecret), func(c *gin.Context) {
+			auth.ChangePassword(c, s.Database)
+		})
+
 	}
 
 	// Manga routes (protected routes)
