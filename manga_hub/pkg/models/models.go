@@ -32,3 +32,8 @@ type UserProgress struct {
 	Status			string `json:"status" db:"status"`
 	UpdatedAt		time.Time `json:"updated_at" db:"updated_at"`
 }
+
+type StatusResponse struct {
+	Status string `json:"status"`
+	User		  `json:"user"`
+}

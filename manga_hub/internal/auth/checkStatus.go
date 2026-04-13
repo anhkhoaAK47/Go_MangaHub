@@ -21,8 +21,9 @@ func CheckStatus(c *gin.Context, db *sql.DB) {
 
 	// fetch user details from database
 	var user models.User
-	query := `SELECT username, created_at FROM users WHERE id = ?`
-	err := db.QueryRow(query, userID).Scan(&user.ID, &user.CreatedAt)
+	
+	query := `SELECT id, username, created_at FROM users WHERE id = ?`
+	err := db.QueryRow(query, userID).Scan(&user.ID, &user.Username, &user.CreatedAt)
 
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
@@ -34,7 +35,7 @@ func CheckStatus(c *gin.Context, db *sql.DB) {
 
 	// Return user info
 	c.JSON(http.StatusOK, gin.H{
-		"isAuthenticated": true,
+		"status": "✅ Authenticated",
 		"user": user,
 	})
 }
