@@ -1,6 +1,7 @@
 package mangahub
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"go_mangahub/manga_hub/pkg/models"
@@ -9,6 +10,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"gitlab.com/david_mbuvi/go_asterisks" // pkg to hide password input
 )
 
 
@@ -91,6 +93,72 @@ var statusCmd = &cobra.Command{
 	},
 }
 
+
+var changePasswordCmd = &cobra.Command{
+	Use: "change-password",
+	Short: "Change your mangahub's account password",
+	Run: func(cmd *cobra.Command, args []string) {
+		// prompt for changing password
+		fmt.Print("Enter current password: ")
+    	currentPassword, err := go_asterisks.GetUsersPassword("", true, os.Stdin, os.Stdout)
+		if err != nil {
+			fmt.Printf("❌ Error: %s", err.Error())
+			return
+		}
+		
+		fmt.Print("Enter new password: ")
+		newPassword, err := go_asterisks.GetUsersPassword("", true, os.Stdin, os.Stdout)
+		if err != nil {
+			fmt.Printf("❌ Error: %s", err.Error())
+			return
+		}
+		
+		// read the saved token
+		tokenData, err := os.ReadFile(".token")
+		if err != nil {
+			fmt.Println("❌ Not logged in.")
+			fmt.Println("Try: mangahub auth login --username <username>")
+			return		
+		}
+
+		token := string(tokenData)
+
+		// create payload from user input
+		input, _ := json.Marshal(map[string]string{
+			"current_password": string(currentPassword),
+			"new_password": string(newPassword),
+		})
+		payload := bytes.NewBuffer(input)
+
+		// send PUT request to server
+		client := &http.Client{}
+		req, err := http.NewRequest("PUT", "http://localhost:8080/auth/change-password", payload)
+		if err != nil {
+			fmt.Println("❌ Failed to create PUT request")
+			return
+		}
+
+		// add jwt token to authorization header
+		req.Header.Add("Authorization", "Bearer " + token)
+		req.Header.Set("Content-Type", "application/json")
+
+		// send the request
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Println("❌ Failed to send PUT request to server")
+			return
+		}
+
+		// handle errors
+		if resp.StatusCode == http.StatusOK {
+			fmt.Println("✅ Password changed successfully!")
+			return
+		} else {
+			fmt.Println("❌ Failed to change password")
+		}
+	},
+}
+
 func init() {
 
 	// add login to auth command
@@ -98,6 +166,9 @@ func init() {
 
 	// add status to auth command
 	AuthCmd.AddCommand(statusCmd)
+
+	// add change-password to auth command
+	AuthCmd.AddCommand(changePasswordCmd)
 
 	// define flags login
 	loginCmd.Flags().StringVarP(&username, "username", "u", "", "your username")
