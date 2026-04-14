@@ -23,10 +23,110 @@ var AuthCmd = &cobra.Command{
 	Short: "Register an account/Log into an account",
 }
 
+// Logic goes here
+// loginCmd
 var loginCmd = &cobra.Command{
-	Use: "login",
+	Use:   "login",
+	Short: "Log into your account",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Login user: %s...\n", username)
+		fmt.Printf("Logging in as %s...\n", username)
+
+		fmt.Print("Enter password: ")
+		password, err := go_asterisks.GetUsersPassword("", true, os.Stdin, os.Stdout)
+		if err != nil {
+			fmt.Printf("❌ Error: %s\n", err.Error())
+			return
+		}
+
+		payload := map[string]string{
+			"username": username,
+			"password": string(password),
+		}
+		jsonData, _ := json.Marshal(payload)
+
+		resp, err := http.Post("http://localhost:8080/auth/login", "application/json", bytes.NewBuffer(jsonData))
+		if err != nil {
+			fmt.Println("❌ Server connection error. Is the server running?")
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			fmt.Println("❌ Login failed: Invalid credentials")
+			return
+		}
+
+		var result map[string]interface{}
+		body, _ := io.ReadAll(resp.Body)
+		json.Unmarshal(body, &result)
+
+		token := result["token"].(string)
+		os.WriteFile(".token", []byte(token), 0644)
+
+		fmt.Printf("✅ Welcome back, %s!\n", username)
+	},
+}
+
+// changePasswordCmd
+var registerCmd = &cobra.Command{
+	Use:   "register [username]",
+	Short: "Create a new account without an email",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		regUsername := args[0]
+		fmt.Printf("Registering user: %s...\n", regUsername)
+
+		fmt.Print("Enter password: ")
+		password, err := go_asterisks.GetUsersPassword("", true, os.Stdin, os.Stdout)
+		if err != nil {
+			fmt.Printf("❌ Error: %s\n", err.Error())
+			return
+		}
+
+		payload := map[string]string{
+			"username": regUsername,
+			"password": string(password),
+		}
+		jsonData, _ := json.Marshal(payload)
+
+		resp, err := http.Post("http://localhost:8080/auth/register", "application/json", bytes.NewBuffer(jsonData))
+		if err != nil {
+			fmt.Println("❌ Server connection error.")
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			fmt.Println("❌ Registration failed. Username might be taken.")
+			return
+		}
+
+		fmt.Printf("✅ Account %s created! You can now login.\n", regUsername)
+	},
+}
+
+// logoutCmd
+var logoutCmd = &cobra.Command{
+	Use:   "logout",
+	Short: "Log out and clear session",
+	Run: func(cmd *cobra.Command, args []string) {
+		tokenData, err := os.ReadFile(".token")
+		if err != nil {
+			fmt.Println("⚠️ You are already logged out.")
+			return
+		}
+
+		client := &http.Client{}
+		req, _ := http.NewRequest("POST", "http://localhost:8080/auth/logout", nil)
+		req.Header.Add("Authorization", "Bearer "+string(tokenData))
+
+		resp, err := client.Do(req)
+		if err == nil {
+			resp.Body.Close()
+		}
+
+		os.Remove(".token")
+		fmt.Println("✅ Logged out successfully and session cleared.")
 	},
 }
 
@@ -164,6 +264,12 @@ func init() {
 	// add login to auth command
 	AuthCmd.AddCommand(loginCmd)
 
+	// add register to auth command
+	AuthCmd.AddCommand(registerCmd)
+
+	// add logout to auth command
+	AuthCmd.AddCommand(logoutCmd)
+	
 	// add status to auth command
 	AuthCmd.AddCommand(statusCmd)
 

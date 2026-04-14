@@ -16,7 +16,7 @@ import (
 type AuthRequest struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
-	Email	 string `json:"email" binding:"required"`
+	Email	 string `json:"email"`
 }
 
 type LoginRequest struct {
@@ -32,13 +32,15 @@ func HandleRegister(c *gin.Context, db *sql.DB) {
 		return
 	}
 
-	// Check email format
-	if (!utils.IsValidEmail(req.Email)) {
-		c.JSON(http.StatusBadRequest, gin.H{
-		"error": "Invalid email format",
-		"suggestion": "Please provide a valid email address",
-	})
-		return
+	// ADDED: Only check email format if user actually provided an email
+	if req.Email != "" {
+		if !utils.IsValidEmail(req.Email) {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":      "Invalid email format",
+				"suggestion": "Please provide a valid email address",
+			})
+			return
+		}
 	}
 
 	// Check password strength
@@ -147,4 +149,11 @@ func HandleLogin(c *gin.Context, db *sql.DB, jwtSecret string) {
 		"expires_at": time.Now().Add(time.Hour * 24),
 	})
 }
-
+// ADDED: HandleLogout controller
+func HandleLogout(c *gin.Context) {
+	// For JWT, client-side token deletion is the primary logout method.
+	// This endpoint allows the server to acknowledge the logout event.
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Logged out successfully from server side",
+	})
+}
