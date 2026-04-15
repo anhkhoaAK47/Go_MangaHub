@@ -146,10 +146,10 @@ var statusCmd = &cobra.Command{
 
 		// create GET request to server
 		client := &http.Client{}
-		req, err := http.NewRequest("GET", "http://localhost:8080/auth/status", nil)
+		req, err := http.NewRequest("GET", "http://localhost:8080/auth/check", nil)
 
 		if err != nil {
-			fmt.Printf("❌ Error sending GET request to /auth/status: %v\n", err)
+			fmt.Printf("❌ Error sending GET request to /auth/check: %v\n", err)
 			return
 		}
 
@@ -175,7 +175,7 @@ var statusCmd = &cobra.Command{
 		}
 		
 		if resp.StatusCode != http.StatusOK {
-			fmt.Println("❌ Error: ",err.Error())
+			fmt.Printf("❌ Server returned error: %s (Status: %d)\n", string(body), resp.StatusCode)
 			return
 		}
 
@@ -250,11 +250,13 @@ var changePasswordCmd = &cobra.Command{
 		}
 
 		// handle errors
-		if resp.StatusCode == http.StatusOK {
-			fmt.Println("✅ Password changed successfully!")
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			fmt.Printf("❌ Failed to change password: %s\n", string(body))
 			return
 		} else {
-			fmt.Println("❌ Failed to change password")
+			fmt.Println("✅ Password changed successfully!")
+			return
 		}
 	},
 }
