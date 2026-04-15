@@ -24,8 +24,8 @@ func Execute() {
 
 func init() {
 	// Add server command to root command
-	rootCmd.AddCommand(apiserver.ServerCmd)
+	rootCmd.AddCommand(apiserver.ServerCmd) // 
 	
 	// Add auth command to root command
-	rootCmd.AddCommand(mangahub.AuthCmd)
+	rootCmd.AddCommand(mangahub.AuthCmd) // 
 }

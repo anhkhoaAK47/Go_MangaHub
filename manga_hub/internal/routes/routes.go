@@ -25,11 +25,19 @@ func SetupRoutes(s *APIServer) {
 		authGroup.POST("/login", func(c *gin.Context) {
 			auth.HandleLogin(c, s.Database, s.JWTSecret)
 		})
+		
+		// PROTECTED ROUTES: require token
+        // FIXED: Added middleware to logout
+		authGroup.POST("/logout", middleware.ValidateMiddleware(s.JWTSecret), func(c *gin.Context) {
+			auth.HandleLogout(c)
+		})
+
 		// requires token (protected route)
 		authGroup.GET("/check", middleware.ValidateMiddleware(s.JWTSecret),func(c *gin.Context) {
 			auth.CheckStatus(c, s.Database)
 		})
-		authGroup.POST("/change-password", middleware.ValidateMiddleware(s.JWTSecret), func(c *gin.Context) {
+		
+		authGroup.PUT("/change-password", middleware.ValidateMiddleware(s.JWTSecret), func(c *gin.Context) {
 			auth.ChangePassword(c, s.Database)
 		})
 

@@ -16,7 +16,7 @@ func InitDB(filepath string) (*sql.DB, error) {
 		id TEXT PRIMARY KEY,
 		username TEXT UNIQUE,
 		password_hash TEXT,
-		email TEXT UNIQUE,
+		email TEXT, -- FIXED: Removed UNIQUE constraint so multiple users can have no email
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
 	CREATE TABLE IF NOT EXISTS manga (

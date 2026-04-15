@@ -71,5 +71,5 @@ var startCmd = &cobra.Command{
 
 func init() {
 	// Add start command to the server command
-	ServerCmd.AddCommand(startCmd)
+	ServerCmd.AddCommand(startCmd) // 
 }
