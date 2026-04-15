@@ -32,13 +32,3 @@ type UserProgress struct {
 	Status			string `json:"status" db:"status"`
 	UpdatedAt		time.Time `json:"updated_at" db:"updated_at"`
 }
-
-type ChangePasswordRequest struct {
-	CurrentPassword string `json:"current_password" binding:"required"`
-	NewPassword		string `json:"new_password" binding:"required"`
-}
-
-type StatusResponse struct {
-	Status string `json:"status"`
-	User		  `json:"user"`
-}
