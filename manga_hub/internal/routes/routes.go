@@ -43,11 +43,11 @@ func SetupRoutes(s *APIServer) {
 
 	}
 
-	// Manga routes (partially protected routes)
+	// Manga routes (public routes)
 	manga := s.Router.Group("/manga")
 	{
-		manga.GET("/", middleware.ValidateMiddleware(s.JWTSecret), controllers.GetAllManga)
-		manga.GET("/:id", middleware.OptionalValidateMiddleware(s.JWTSecret), controllers.GetMangaInfo)
+		manga.GET("/", controllers.GetAllManga)
+		manga.GET("/:id", controllers.GetMangaInfo)
 	}
 
 	// Users routes (protected routes)
@@ -55,14 +55,8 @@ func SetupRoutes(s *APIServer) {
 	{
 		users.Use(middleware.ValidateMiddleware(s.JWTSecret))
 
-		users.POST("/library", func(c *gin.Context) {
-			c.JSON(200, gin.H{"message": "Not implemented yet"})
-		})
-		users.GET("/library", func(c *gin.Context) {
-			c.JSON(200, gin.H{"message": "Not implemented yet"})
-		})
-		users.PUT("/progress", func(c *gin.Context) {
-			c.JSON(200, gin.H{"message": "Not implemented yet"})
-		})
+		users.POST("/library", )
+		users.GET("/library", )
+		users.PUT("/progress", )
 	}
 }
