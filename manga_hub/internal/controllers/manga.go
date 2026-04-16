@@ -53,6 +53,32 @@ func GetAllManga(c *gin.Context) {
 	c.JSON(http.StatusOK, mangaList)
 }
 
+func GetMangaByTitle(c *gin.Context) {
+	title := c.Param("title")
+
+	// Query
+	var m models.Manga
+
+	err := db.QueryRow("SELECT id, title, author, status, total_chapters FROM manga WHERE title LIKE ?", title).
+	Scan(&m.ID, &m.Title, &m.Author, &m.Status, &m.TotalChapters)
+
+	// if not found
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "No manga found matching your search criteria",
+		})
+		return
+	} else if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	
+	c.JSON(http.StatusOK, m)
+}
+
 func GetMangaInfo(c *gin.Context) {
 	id := c.Param("id")
 	userID, exists := c.Get("user_id")
