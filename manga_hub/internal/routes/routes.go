@@ -10,8 +10,8 @@ import (
 )
 
 type APIServer struct {
-	Router *gin.Engine
-	Database *sql.DB
+	Router    *gin.Engine
+	Database  *sql.DB
 	JWTSecret string
 }
 
@@ -25,31 +25,29 @@ func SetupRoutes(s *APIServer) {
 		authGroup.POST("/login", func(c *gin.Context) {
 			auth.HandleLogin(c, s.Database, s.JWTSecret)
 		})
-		
+
 		// PROTECTED ROUTES: require token
-        // FIXED: Added middleware to logout
+		// FIXED: Added middleware to logout
 		authGroup.POST("/logout", middleware.ValidateMiddleware(s.JWTSecret), func(c *gin.Context) {
 			auth.HandleLogout(c)
 		})
 
 		// requires token (protected route)
-		authGroup.GET("/check", middleware.ValidateMiddleware(s.JWTSecret),func(c *gin.Context) {
+		authGroup.GET("/check", middleware.ValidateMiddleware(s.JWTSecret), func(c *gin.Context) {
 			auth.CheckStatus(c, s.Database)
 		})
-		
+
 		authGroup.PUT("/change-password", middleware.ValidateMiddleware(s.JWTSecret), func(c *gin.Context) {
 			auth.ChangePassword(c, s.Database)
 		})
 
 	}
 
-	// Manga routes (protected routes)
+	// Manga routes (partially protected routes)
 	manga := s.Router.Group("/manga")
 	{
-		manga.Use(middleware.ValidateMiddleware(s.JWTSecret))
-
-		manga.GET("/", controllers.GetAllManga)
-		manga.GET("/:id", controllers.GetMangaInfo)
+		manga.GET("/", middleware.ValidateMiddleware(s.JWTSecret), controllers.GetAllManga)
+		manga.GET("/:id", middleware.OptionalValidateMiddleware(s.JWTSecret), controllers.GetMangaInfo)
 	}
 
 	// Users routes (protected routes)
@@ -57,8 +55,14 @@ func SetupRoutes(s *APIServer) {
 	{
 		users.Use(middleware.ValidateMiddleware(s.JWTSecret))
 
-		users.POST("/library", )
-		users.GET("/library",)
-		users.PUT("/progress", )
+		users.POST("/library", func(c *gin.Context) {
+			c.JSON(200, gin.H{"message": "Not implemented yet"})
+		})
+		users.GET("/library", func(c *gin.Context) {
+			c.JSON(200, gin.H{"message": "Not implemented yet"})
+		})
+		users.PUT("/progress", func(c *gin.Context) {
+			c.JSON(200, gin.H{"message": "Not implemented yet"})
+		})
 	}
 }

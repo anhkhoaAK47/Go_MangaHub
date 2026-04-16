@@ -38,12 +38,13 @@ var startCmd = &cobra.Command{
 		
 	jwtSecret := os.Getenv("JWTSECRETKEY")
 
-	db, err := database.InitDB("D:/DatabaseSQLite/mangahub.db")
+		db, err := database.InitDB("./mangahub.db")
 	
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
 
+	// Seed initial data
 	err = database.SeedSampleManga(db)
 	if err != nil {
 		log.Println(err)
@@ -54,9 +55,6 @@ var startCmd = &cobra.Command{
 		Database: db,
 		JWTSecret: jwtSecret,
 	}
-
-	// Seed initial data
-	database.SeedSampleManga(db)
 
 	// Provide DB handle to controllers
 	controllers.SetDB(db)

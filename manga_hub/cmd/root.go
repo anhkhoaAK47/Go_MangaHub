@@ -28,4 +28,8 @@ func init() {
 	
 	// Add auth command to root command
 	rootCmd.AddCommand(mangahub.AuthCmd) // 
+
+	// FIXED: Corrected reference to MangaCmd which is in the mangahub package
+	rootCmd.AddCommand(mangahub.MangaCmd) 
+
 }

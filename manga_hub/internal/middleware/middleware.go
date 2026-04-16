@@ -74,3 +74,33 @@ func ValidateMiddleware(secret string) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+func OptionalValidateMiddleware(secret string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.Next()
+			return
+		}
+
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			c.Next()
+			return
+		}
+
+		tokenString := parts[1]
+		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+			return []byte(secret), nil
+		})
+
+		if err == nil && token.Valid {
+			if claims, ok := token.Claims.(jwt.MapClaims); ok {
+				if userID, exists := claims["user_id"].(string); exists {
+					c.Set("user_id", userID)
+				}
+			}
+		}
+		c.Next()
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"go_mangahub/manga_hub/pkg/models"
 )
 
 
@@ -63,33 +64,49 @@ func SeedSampleManga(db *sql.DB) error {
 	// 	{ID: "re-life", Title: "ReLife", Author: "Yayoiso", Genres: []string{"Drama", "Slice of Life", "Seinen"}, Status: "completed", TotalChapters: 222, Description: "A 27-year-old reliving high school."},
 	// }
 
-	mangaList, err := FetchMangaDex()
-	if err != nil {
-		fmt.Printf("Failed to fetch data: %v", err)
-		return err
+	// Hardcoded One Piece for testing based on user requirement
+	onePiece := models.Manga{
+		ID:            "one-piece",
+		Title:         "One Piece (ワンピース)",
+		Author:        "Oda Eiichiro",
+		Artist:        "Oda Eiichiro",
+		Genres:        []string{"Action", "Adventure", "Comedy", "Drama", "Shounen"},
+		Status:        "Ongoing",
+		Year:          1997,
+		TotalChapters: 1100,
+		TotalVolumes:  107,
+		Serialization: "Weekly Shounen Jump",
+		Publisher:     "Shueisha",
+		Description:   "Monkey D. Luffy, a boy whose body gained the properties of rubber after eating a Devil Fruit, explores the Grand Line with his diverse crew of pirates in search of the treasure known as \"One Piece\" to become the next Pirate King.",
+		MyAnimeList:   "https://myanimelist.net/manga/13",
+		MangaDx:       "https://mangadx.org/title/a1c7c817-4e59-43b7-9365-09675a149a6f",
+	}
+
+	mangaList := []models.Manga{onePiece}
+
+	// Try to fetch more from MangaDex
+	dexManga, err := FetchMangaDex()
+	if err == nil {
+		mangaList = append(mangaList, dexManga...)
 	}
 
 	// insert into database
-	query := `INSERT INTO manga (id, title, author, genres, status, total_chapters, description) VALUES (?, ?, ?, ?, ?, ?, ?)`
-
+	query := `INSERT INTO manga (id, title, author, artist, genres, status, year, total_chapters, total_volumes, serialization, publisher, description, my_anime_list, manga_dx) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	for _, m := range mangaList {
-		// Convert genre slice to JSON
-		genreJSON, _ := json.Marshal(m.Genres)
-
-		 _, err := db.Exec(query, 
-        m.ID, 
-        m.Title, 
-        m.Author, 
-        string(genreJSON), 
-        m.Status, 
-        m.TotalChapters, 
-        m.Description,
-    )
+			genreJSON, _ := json.Marshal(m.Genres)
+		_, err := db.Exec(query,
+			m.ID, m.Title, m.Author, m.Artist, string(genreJSON), m.Status, m.Year, m.TotalChapters, m.TotalVolumes, m.Serialization, m.Publisher, m.Description, m.MyAnimeList, m.MangaDx,
+		)
 		if err != nil {
 			fmt.Printf("Error seeding manga %s: %s\n", m.Title, err)
 		}
 	}
-	fmt.Println("Manga seeded successfully!")
+
+	// Seed sample progress for testing
+	_, _ = db.Exec(`INSERT INTO user_progress (user_id, manga_id, current_chapter, status, rating, started_reading, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"test-user-id", "one-piece", 1095, "Currently Reading", 9, "2023-03-15T00:00:00Z", "2024-01-20T15:30:00Z")
+
+	fmt.Println("Manga and sample progress seeded successfully!")
 	return nil
 }
