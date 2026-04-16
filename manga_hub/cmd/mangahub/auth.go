@@ -67,14 +67,12 @@ var loginCmd = &cobra.Command{
 	},
 }
 
-// changePasswordCmd
+// registerCmd
 var registerCmd = &cobra.Command{
 	Use:   "register [username]",
 	Short: "Create a new account without an email",
-	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		regUsername := args[0]
-		fmt.Printf("Registering user: %s...\n", regUsername)
+		fmt.Printf("Registering user: %s...\n", username)
 
 		fmt.Print("Enter password: ")
 		password, err := go_asterisks.GetUsersPassword("", true, os.Stdin, os.Stdout)
@@ -84,7 +82,7 @@ var registerCmd = &cobra.Command{
 		}
 
 		payload := map[string]string{
-			"username": regUsername,
+			"username": username,
 			"password": string(password),
 		}
 		jsonData, _ := json.Marshal(payload)
@@ -101,7 +99,7 @@ var registerCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Printf("✅ Account %s created! You can now login.\n", regUsername)
+		fmt.Printf("✅ Account %s created! You can now login.\n", username)
 	},
 }
 
@@ -281,6 +279,11 @@ func init() {
 	// define flags login
 	loginCmd.Flags().StringVarP(&username, "username", "u", "", "your username")
 	loginCmd.MarkFlagRequired("username")
+
+
+	// define flags register
+	registerCmd.Flags().StringVarP(&username, "username", "u", "", "your username")
+	registerCmd.MarkFlagRequired("username")
 
 	
 }
