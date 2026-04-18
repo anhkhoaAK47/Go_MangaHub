@@ -157,3 +157,4 @@ func HandleLogout(c *gin.Context) {
 		"message": "Logged out successfully from server side",
 	})
 }
+

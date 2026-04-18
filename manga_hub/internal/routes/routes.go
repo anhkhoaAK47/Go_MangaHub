@@ -3,16 +3,18 @@ package routes
 import (
 	"database/sql"
 
-	"github.com/gin-gonic/gin"
 	"go_mangahub/manga_hub/internal/auth"
 	"go_mangahub/manga_hub/internal/controllers"
 	"go_mangahub/manga_hub/internal/middleware"
+
+	"github.com/gin-gonic/gin"
 )
 
 type APIServer struct {
 	Router    *gin.Engine
 	Database  *sql.DB
 	JWTSecret string
+	Shutdown  chan bool
 }
 
 func SetupRoutes(s *APIServer) {
@@ -58,5 +60,21 @@ func SetupRoutes(s *APIServer) {
 		users.POST("/library", )
 		users.GET("/library", )
 		users.PUT("/progress", )
+	}
+
+	// server routes (protected routes)
+	servers := s.Router.Group("/server")
+	{
+		servers.Use(middleware.ValidateMiddleware(s.JWTSecret))
+
+		servers.POST("/stop", func(c *gin.Context) {
+			c.JSON(200, gin.H{
+				"message": "Server shutting down...",
+			})
+
+			go func() {
+				s.Shutdown <- true
+			}()
+		})
 	}
 }
