@@ -45,3 +45,30 @@ type MangaInfoResponse struct {
 	Manga    Manga         `json:"manga"`
 	Progress *UserProgress `json:"progress,omitempty"`
 }
+
+type LibraryEntry struct {
+	MangaID         string    `json:"manga_id"`
+	Title           string    `json:"title"`
+	CurrentChapter  int       `json:"current_chapter"`
+	TotalChapters   int       `json:"total_chapters"`
+	Status          string    `json:"status"`
+	Rating          int       `json:"rating"`
+	StartedReading  time.Time `json:"started_reading"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+type AddLibraryRequest struct {
+	MangaID string `json:"manga_id"`
+	Status  string `json:"status"`
+	Rating  int    `json:"rating,omitempty"`
+}
+
+type UpdateLibraryRequest struct {
+	Status string `json:"status,omitempty"`
+	Rating *int   `json:"rating,omitempty"`
+}
+
+type LibraryListResponse struct {
+	Entries []LibraryEntry `json:"entries"`
+	Total   int            `json:"total"`
+}

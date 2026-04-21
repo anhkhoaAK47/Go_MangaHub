@@ -32,4 +32,7 @@ func init() {
 	// Add manga command to root command
 	rootCmd.AddCommand(mangahub.MangaCmd) 
 
+	// Add library command to root command
+	rootCmd.AddCommand(mangahub.LibraryCmd)
+
 }
