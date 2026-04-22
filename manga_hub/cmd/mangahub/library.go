@@ -64,7 +64,7 @@ var addLibraryCmd = &cobra.Command{
 
 		respBody, _ := io.ReadAll(resp.Body)
 		if resp.StatusCode != http.StatusOK {
-			fmt.Printf("❌ Failed to add to library: %s\n", string(respBody))
+			fmt.Printf("❌ Failed to add to library: %s\n", extractLibraryError(respBody))
 			return
 		}
 
@@ -114,7 +114,7 @@ var listLibraryCmd = &cobra.Command{
 
 		body, _ := io.ReadAll(resp.Body)
 		if resp.StatusCode != http.StatusOK {
-			fmt.Printf("❌ Failed to list library: %s\n", string(body))
+			fmt.Printf("❌ Failed to list library: %s\n", extractLibraryError(body))
 			return
 		}
 
@@ -215,7 +215,7 @@ var removeLibraryCmd = &cobra.Command{
 
 		body, _ := io.ReadAll(resp.Body)
 		if resp.StatusCode != http.StatusOK {
-			fmt.Printf("❌ Failed to remove from library: %s\n", string(body))
+			fmt.Printf("❌ Failed to remove from library: %s\n", extractLibraryError(body))
 			return
 		}
 		fmt.Printf("✅ Removed '%s' from your library.\n", libraryMangaID)
@@ -260,11 +260,21 @@ var updateLibraryCmd = &cobra.Command{
 
 		respBody, _ := io.ReadAll(resp.Body)
 		if resp.StatusCode != http.StatusOK {
-			fmt.Printf("❌ Failed to update library: %s\n", string(respBody))
+			fmt.Printf("❌ Failed to update library: %s\n", extractLibraryError(respBody))
 			return
 		}
 		fmt.Printf("✅ Updated '%s' in your library.\n", libraryMangaID)
 	},
+}
+
+func extractLibraryError(body []byte) string {
+	var payload map[string]interface{}
+	if err := json.Unmarshal(body, &payload); err == nil {
+		if msg, ok := payload["error"].(string); ok && msg != "" {
+			return msg
+		}
+	}
+	return string(body)
 }
 
 func init() {

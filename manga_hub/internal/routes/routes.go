@@ -62,6 +62,9 @@ func SetupRoutes(s *APIServer) {
 		users.DELETE("/library/:id", controllers.RemoveFromLibrary)
 		users.PUT("/library/:id", controllers.UpdateLibraryEntry)
 		users.PUT("/progress", controllers.UpdateProgress)
+		users.GET("/progress/history", controllers.GetProgressHistory)
+		users.POST("/progress/sync", controllers.SyncProgress)
+		users.GET("/progress/sync-status", controllers.SyncProgressStatus)
 	}
 
 	// server routes (protected routes)

@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -45,8 +46,18 @@ func InitDB(filepath string) (*sql.DB, error) {
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		PRIMARY KEY (user_id, manga_id)
 	);
+	CREATE TABLE IF NOT EXISTS progress_history (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id TEXT NOT NULL,
+		manga_id TEXT NOT NULL,
+		previous_chapter INTEGER NOT NULL,
+		current_chapter INTEGER NOT NULL,
+		volume INTEGER DEFAULT 0,
+		notes TEXT DEFAULT '',
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
 	`
 	_, err = db.Exec(schema)
 	return db, err
-	
+
 }
