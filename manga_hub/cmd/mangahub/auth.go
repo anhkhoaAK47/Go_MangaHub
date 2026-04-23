@@ -51,13 +51,25 @@ var loginCmd = &cobra.Command{
 		}
 		defer resp.Body.Close()
 
+		body, _ := io.ReadAll(resp.Body)
+
 		if resp.StatusCode != http.StatusOK {
-			fmt.Println("❌ Login failed: Invalid credentials")
+			var result map[string]interface{}
+			if err := json.Unmarshal(body, &result); err == nil {
+				if errMsg, ok := result["error"].(string); ok {
+					fmt.Printf("❌ %s\n", errMsg)
+					if suggestion, ok := result["suggestion"].(string); ok {
+						fmt.Printf("💡 %s\n", suggestion)
+					}
+					return
+				}
+			}
+			// fallback
+			fmt.Printf("❌ Login failed: %s\n", string(body))
 			return
 		}
 
 		var result map[string]interface{}
-		body, _ := io.ReadAll(resp.Body)
 		json.Unmarshal(body, &result)
 
 		token := result["token"].(string)
@@ -88,14 +100,30 @@ var registerCmd = &cobra.Command{
 		jsonData, _ := json.Marshal(payload)
 
 		resp, err := http.Post("http://localhost:8080/auth/register", "application/json", bytes.NewBuffer(jsonData))
+
 		if err != nil {
 			fmt.Println("❌ Server connection error.")
 			return
 		}
 		defer resp.Body.Close()
 
+		// ✅ Read body so we can print the server's error message
+		body, _ := io.ReadAll(resp.Body)
+
 		if resp.StatusCode != http.StatusOK {
-			fmt.Println("❌ Registration failed. Username might be taken.")
+			// ✅ Parse and print the "error" field from HandleRegister's JSON response
+			var result map[string]interface{}
+			if err := json.Unmarshal(body, &result); err == nil {
+				if errMsg, ok := result["error"].(string); ok {
+					fmt.Printf("❌ %s\n", errMsg)
+					if suggestion, ok := result["suggestion"].(string); ok {
+						fmt.Printf("💡 %s\n", suggestion)
+					}
+					return
+				}
+			}
+			// fallback if JSON parsing fails
+			fmt.Printf("❌ Registration failed: %s\n", string(body))
 			return
 		}
 
