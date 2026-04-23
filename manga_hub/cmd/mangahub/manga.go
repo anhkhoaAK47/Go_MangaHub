@@ -5,12 +5,21 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"go_mangahub/manga_hub/pkg/models"
+	"go_mangahub/manga_hub/pkg/utils"
 
 	"github.com/spf13/cobra"
+)
+
+var (
+	searchGenre string
+	searchStatus string
+	searchLimit int
 )
 
 var MangaCmd = &cobra.Command{
@@ -126,6 +135,80 @@ var infoCmd = &cobra.Command{
 	},
 }
 
+var searchCmd = &cobra.Command{
+	Use: "search [query]",
+	Short: "Search for manga by title, genre, or status",
+	Run: func(cmd *cobra.Command, args []string) {
+		query := ""
+		if len(args) > 0 {
+			query = args[0]
+		}
+
+		if query != "" {
+			fmt.Printf("Searching for \"%s\"...\n", query)
+		}
+
+		params := url.Values{}
+		if query != "" {
+			params.Set("query", query)
+		}
+		if searchGenre != "" {
+			params.Set("genre", searchGenre)
+		}
+		if searchStatus != "" {
+			params.Set("status", searchStatus)
+		}
+		if searchLimit > 0 {
+			params.Set("limit", strconv.Itoa(searchLimit))
+		}
+
+
+		fullUrl := "http://localhost:8080/manga/?" + params.Encode()
+
+		resp, err := http.Get(fullUrl)
+		if err != nil {
+			fmt.Println("❌ Server connection error.")
+			return
+		}
+		defer resp.Body.Close()
+
+		body, _ := io.ReadAll(resp.Body)
+
+		var mangaList []models.Manga
+		if err := json.Unmarshal(body, &mangaList); err != nil {
+			fmt.Println("❌ Failed to parse server response")
+			return
+		}
+
+		// No result
+		if len(mangaList) == 0 {
+			if query != "" {
+				fmt.Printf("No manga found for \"%s\"...", query)
+			} else {
+				fmt.Println("No manga found.")
+			}
+
+			fmt.Println("\nSuggestion:")
+			fmt.Println("	-Browse by genre: mangahub manga list --genre action")
+			return
+		}
+
+		// Print results
+		fmt.Printf("Found %d result(s):\n\n", len(mangaList))
+
+		utils.PrintMangaTable(mangaList)
+
+		fmt.Println("\nUse 'mangahub manga info <id>' to view details")
+		fmt.Println("Use 'mangahub library add --manga-id <id>' to add to your library")
+
+	},
+}
+
 func init() {
+	// add search command
+	MangaCmd.AddCommand(searchCmd)
+
+	// add info command
 	MangaCmd.AddCommand(infoCmd)
+
 }

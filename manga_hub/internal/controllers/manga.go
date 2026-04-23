@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"go_mangahub/manga_hub/pkg/models"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -20,6 +22,14 @@ func SetDB(d *sql.DB) {
 
 
 func GetAllManga(c *gin.Context) {
+
+	// Read query params from URL
+	search := strings.ToLower(c.Query("query"))
+	genre := strings.ToLower(c.Query("genre"))
+	status := strings.ToLower(c.Query("status"))
+	limit := c.Query("limit")
+
+
 	// Query
 	query := `SELECT id, title, author, artist, genres, status, year, total_chapters, total_volumes, serialization, publisher, description, my_anime_list, manga_dx FROM manga`
 
@@ -46,10 +56,51 @@ func GetAllManga(c *gin.Context) {
 
 		// Convert JSON into go string slice []string
 		json.Unmarshal([]byte(genresString), &m.Genres)
+		
+		// Filter by search query (title or author)
+		if search != "" {
+			titleMatch  := strings.Contains(strings.ToLower(m.Title), search)
+			authorMatch := strings.Contains(strings.ToLower(m.Author), search)
+			if !titleMatch && !authorMatch {
+				continue
+			}
+		}
 
+		// Filter by genre
+		if genre != "" {
+			matched := false
+			for _, g := range m.Genres {
+				if strings.Contains(strings.ToLower(g), genre) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+		}
+
+		// Filter by status
+		if status != "" {
+			if !strings.Contains(strings.ToLower(m.Status), status) {
+				continue
+			}
+		}
 		mangaList = append(mangaList, m)
 	}
+	
+	// Apply limit
+	if limit != "" {
+		n, err := strconv.Atoi(limit)
+		if err == nil && n > 0 && n < len(mangaList) {
+			mangaList = mangaList[:n]
+		}
+	}
 
+	// Return empty array instead of null
+	if mangaList == nil {
+		mangaList = []models.Manga{}
+	}
 	c.JSON(http.StatusOK, mangaList)
 }
 
