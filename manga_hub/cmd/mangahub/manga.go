@@ -207,6 +207,9 @@ var searchCmd = &cobra.Command{
 func init() {
 	// add search command
 	MangaCmd.AddCommand(searchCmd)
+	searchCmd.Flags().StringVarP(&searchGenre, "genre", "g", "", "Filter by genre")
+	searchCmd.Flags().StringVarP(&searchStatus, "status", "s", "", "Filter by status (ongoing/completed)")
+	searchCmd.Flags().IntVarP(&searchLimit, "limit", "l", 0, "Limit number of results")
 
 	// add info command
 	MangaCmd.AddCommand(infoCmd)
