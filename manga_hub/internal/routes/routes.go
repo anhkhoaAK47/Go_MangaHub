@@ -57,9 +57,14 @@ func SetupRoutes(s *APIServer) {
 	{
 		users.Use(middleware.ValidateMiddleware(s.JWTSecret))
 
-		users.POST("/library", )
-		users.GET("/library", )
-		users.PUT("/progress", )
+		users.POST("/library", controllers.AddToLibrary)
+		users.GET("/library", controllers.ListLibrary)
+		users.DELETE("/library/:id", controllers.RemoveFromLibrary)
+		users.PUT("/library/:id", controllers.UpdateLibraryEntry)
+		users.PUT("/progress", controllers.UpdateProgress)
+		users.GET("/progress/history", controllers.GetProgressHistory)
+		users.POST("/progress/sync", controllers.SyncProgress)
+		users.GET("/progress/sync-status", controllers.SyncProgressStatus)
 	}
 
 	// server routes (protected routes)

@@ -9,9 +9,9 @@ import (
 	"go_mangahub/manga_hub/cmd/mangahub"
 )
 
-//  base "mangahub" command
+// base "mangahub" command
 var rootCmd = &cobra.Command{
-	Use: "mangahub",
+	Use:   "mangahub",
 	Short: "Mangahub is a tool to track your manga progress",
 }
 
@@ -24,12 +24,18 @@ func Execute() {
 
 func init() {
 	// Add server command to root command
-	rootCmd.AddCommand(apiserver.ServerCmd) // 
-	
+	rootCmd.AddCommand(apiserver.ServerCmd) //
+
 	// Add auth command to root command
-	rootCmd.AddCommand(mangahub.AuthCmd) // 
+	rootCmd.AddCommand(mangahub.AuthCmd) //
 
 	// Add manga command to root command
-	rootCmd.AddCommand(mangahub.MangaCmd) 
+	rootCmd.AddCommand(mangahub.MangaCmd)
+
+	// Add library command to root command
+	rootCmd.AddCommand(mangahub.LibraryCmd)
+
+	// Add progress command to root command
+	rootCmd.AddCommand(mangahub.ProgressCmd)
 
 }
