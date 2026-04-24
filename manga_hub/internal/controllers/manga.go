@@ -27,7 +27,12 @@ func GetAllManga(c *gin.Context) {
 	search := strings.ToLower(c.Query("query"))
 	genre := strings.ToLower(c.Query("genre"))
 	status := strings.ToLower(c.Query("status"))
-	limit := c.Query("limit")
+	
+	// get pagination params
+	limitStr := c.DefaultQuery("limit", "20")
+	pageStr := c.DefaultQuery("page", "1")
+	limit, _ := strconv.Atoi(limitStr)
+	page, _ := strconv.Atoi(pageStr)
 
 
 	// Query
@@ -89,18 +94,20 @@ func GetAllManga(c *gin.Context) {
 		mangaList = append(mangaList, m)
 	}
 	
-	// Apply limit
-	if limit != "" {
-		n, err := strconv.Atoi(limit)
-		if err == nil && n > 0 && n < len(mangaList) {
-			mangaList = mangaList[:n]
-		}
-	}
+	totalResults := len(mangaList)
+	start := (page - 1) * limit
+	end := start + limit
 
 	// Return empty array instead of null
-	if mangaList == nil {
+	if start > totalResults {
 		mangaList = []models.Manga{}
+	} else {
+		if end > totalResults {
+			end = totalResults
+		}
+		mangaList = mangaList[start:end]
 	}
+
 	c.JSON(http.StatusOK, mangaList)
 }
 

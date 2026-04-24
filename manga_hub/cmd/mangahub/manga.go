@@ -20,6 +20,9 @@ var (
 	searchGenre string
 	searchStatus string
 	searchLimit int
+	listGenre string
+	listPage int
+	listLimit int
 )
 
 var MangaCmd = &cobra.Command{
@@ -204,6 +207,47 @@ var searchCmd = &cobra.Command{
 	},
 }
 
+
+var listCmd = &cobra.Command{
+	Use: "list",
+	Short: "List all manga in the database",
+	Run: func(cmd *cobra.Command, args []string) {
+		params := url.Values{}
+
+		// set params based on flags
+		if listGenre != "" {
+			params.Set("genre", listGenre)
+		}
+
+		params.Set("page", strconv.Itoa(listPage))
+		params.Set("limit", strconv.Itoa(listLimit))
+
+		fmt.Printf("Listing all manga (Page %d, Limit %d)...\n", listPage, listLimit)
+
+		fullUrl := "http://localhost:8080/manga/?" + params.Encode()
+
+		resp, err := http.Get(fullUrl)
+		if err != nil {
+			fmt.Println("❌ Server connection error")
+			return
+		}
+		defer resp.Body.Close()
+
+		body, _ := io.ReadAll(resp.Body)
+		var mangaList []models.Manga
+		json.Unmarshal(body, &mangaList)
+
+		if len(mangaList) == 0 {
+			fmt.Println("No manga found for this criteria.")
+			return
+		}
+
+		utils.PrintMangaTable(mangaList)
+
+		fmt.Printf("\nShowing %d results. Use --page to see more.\n", len(mangaList))
+	},
+}
+
 func init() {
 	// add search command
 	MangaCmd.AddCommand(searchCmd)
@@ -214,4 +258,9 @@ func init() {
 	// add info command
 	MangaCmd.AddCommand(infoCmd)
 
+	// add list command
+	MangaCmd.AddCommand(listCmd)
+	listCmd.Flags().StringVarP(&listGenre, "genre", "g", "", "Filter by genre")
+	listCmd.Flags().IntVarP(&listPage, "page", "p", 1, "Page number")
+	listCmd.Flags().IntVarP(&listLimit, "limit", "l", 20, "Number of results per page")
 }
