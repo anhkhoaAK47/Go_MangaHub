@@ -6,3 +6,6 @@ mangahub.db
 
 # Ignore tokens
 *.token
+
+# Ignore sessions
+*.session
