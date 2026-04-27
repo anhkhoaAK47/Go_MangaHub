@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"go_mangahub/manga_hub/internal/tcp"
 	"go_mangahub/manga_hub/pkg/models"
 
 	"github.com/gin-gonic/gin"
@@ -19,6 +20,18 @@ var validLibraryStatuses = map[string]bool{
 	"on-hold":      true,
 	"dropped":      true,
 }
+
+type TCPBroadcaster interface {
+	BroadcastUpdate(update tcp.ProgressUpdate)
+	ConnectedCount() int
+}
+
+var tcpServer TCPBroadcaster
+
+func SetTCPServer(s TCPBroadcaster) {
+	tcpServer = s
+}
+
 
 func isValidLibraryStatus(status string) bool {
 	return validLibraryStatuses[status]
@@ -332,6 +345,18 @@ func UpdateProgress(c *gin.Context) {
 		nextAvailableChapter = 0
 	}
 
+	tcpStatus := "Not connected"
+	if tcpServer != nil {
+		tcpServer.BroadcastUpdate(tcp.ProgressUpdate{
+			UserID: userID,
+			MangaID: req.MangaID,
+			Chapter: req.Chapter,
+			Timestamp: now.Unix(),
+		})
+
+		tcpStatus = fmt.Sprintf("Broadcasting to %d connected devices", tcpServer.ConnectedCount())
+	}
+
 	response := models.ProgressUpdateResponse{
 		Message:         "Progress updated successfully",
 		MangaID:         req.MangaID,
@@ -341,7 +366,7 @@ func UpdateProgress(c *gin.Context) {
 		UpdatedAt:       now,
 		Sync: models.SyncStatus{
 			LocalDatabase: "Updated",
-			TCPServer:     "Pending (sync server integration required)",
+			TCPServer:     tcpStatus,
 			CloudBackup:   "Pending (backup service integration required)",
 		},
 		Statistics: models.ProgressStatistics{

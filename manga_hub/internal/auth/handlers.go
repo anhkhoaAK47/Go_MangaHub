@@ -145,6 +145,7 @@ func HandleLogin(c *gin.Context, db *sql.DB, jwtSecret string) {
 		"success": "Login successful!",
 		"message": "Welcome back, " + req.Username + "!",
 		"username": req.Username,
+		"user_id": userID,
 		"token": token,
 		"expires_at": time.Now().Add(time.Hour * 24),
 	})

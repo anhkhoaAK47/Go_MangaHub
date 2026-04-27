@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
 	"go_mangahub/manga_hub/cmd/api-server"
 	"go_mangahub/manga_hub/cmd/mangahub"
+	tcpserver "go_mangahub/manga_hub/cmd/tcp-server"
+
+	"github.com/spf13/cobra"
 )
 
 // base "mangahub" command
@@ -38,4 +40,6 @@ func init() {
 	// Add progress command to root command
 	rootCmd.AddCommand(mangahub.ProgressCmd)
 
+	// Add sync command to root command
+	rootCmd.AddCommand(tcpserver.SyncCmd)
 }

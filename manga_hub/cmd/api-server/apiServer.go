@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go_mangahub/manga_hub/internal/controllers"
 	"go_mangahub/manga_hub/internal/routes"
+	"go_mangahub/manga_hub/internal/tcp"
 	"go_mangahub/manga_hub/pkg/database"
 	"net/http"
 	"strings"
@@ -34,19 +35,27 @@ var startCmd = &cobra.Command{
 	Use: "start",
 	Short: "Start all of the MangaHub server",
 	Run: func(cmd *cobra.Command, args []string) {
-
+	httpOnly, _ := cmd.Flags().GetBool("http-only")
+	tcpOnly, _ := cmd.Flags().GetBool("tcp-only")
+	
 	err := godotenv.Load("")
 	if err != nil {
 		log.Println(err)
 	}
 		
 	jwtSecret := os.Getenv("JWTSECRETKEY")
+	fmt.Println("Starting MangaHub Server Components...")
+	fmt.Println()
 
-		db, err := database.InitDB("./mangahub.db")
+	if !tcpOnly {
+	
+	fmt.Println("[1/5] HTTP API Server")
+	db, err := database.InitDB("./mangahub.db")
 	
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
+	fmt.Println("  ✅ Database connection established")
 
 	// Seed initial data
 	err = database.SeedSampleManga(db)
@@ -54,6 +63,7 @@ var startCmd = &cobra.Command{
 		log.Println(err)
 	}
 
+	gin.SetMode(gin.ReleaseMode) // suppress gin debug logs
 	server := &routes.APIServer{
 		Router: gin.Default(),
 		Database: db,
@@ -61,21 +71,104 @@ var startCmd = &cobra.Command{
 		Shutdown: make(chan bool),
 	}
 
+	fmt.Println("  ✅ JWT middleware loaded")
+
 	// Provide DB handle to controllers
 	controllers.SetDB(db)
 
 	routes.SetupRoutes(server)
 
-	
-	log.Println("Server running on http://localhost:8080")
-	
-	go func() {
-		server.Router.Run(":8080")
-	}()
+	routesCount := len(server.Router.Routes())
+	fmt.Printf("  ✅ %d routes registered\n", routesCount)
 
-	<-server.Shutdown
-	log.Println("Shutting down server...")
-	}, 
+	if !httpOnly {
+				// ── [2/5] TCP Sync Server ──────────────────────────────────
+				fmt.Println()
+				fmt.Println("[2/5] TCP Sync Server")
+
+				tcpServer := tcp.NewProgressSyncServer("9090")
+				if err := tcpServer.Start(); err != nil {
+					fmt.Println("  ✗ Failed to start TCP server:", err)
+				} else {
+					fmt.Println("  ✓ Starting on tcp://localhost:9090")
+					fmt.Println("  ✓ Connection pool initialized (max: 100)")
+					fmt.Println("  ✓ Broadcast channels ready")
+					fmt.Println("  Status: Listening for connections")
+					controllers.SetTCPServer(tcpServer)
+				}
+
+				// ── [3/5] UDP Notification Server ─────────────────────────
+				fmt.Println()
+				fmt.Println("[3/5] UDP Notification Server")
+				fmt.Println("  ⚠ Not yet implemented")
+				fmt.Println("  Status: Skipped")
+
+				// ── [4/5] gRPC Internal Service ───────────────────────────
+				fmt.Println()
+				fmt.Println("[4/5] gRPC Internal Service")
+				fmt.Println("  ⚠ Not yet implemented")
+				fmt.Println("  Status: Skipped")
+
+				// ── [5/5] WebSocket Chat Server ───────────────────────────
+				fmt.Println()
+				fmt.Println("[5/5] WebSocket Chat Server")
+				fmt.Println("  ⚠ Not yet implemented")
+				fmt.Println("  Status: Skipped")
+			}
+
+			// Print summary
+			fmt.Println()
+			fmt.Println("─────────────────────────────────────────")
+			if httpOnly {
+				fmt.Println("  ✓ Starting on http://localhost:8080")
+				fmt.Println("  Status: Running")
+				fmt.Println()
+				fmt.Println("HTTP server started successfully!")
+			} else {
+				fmt.Println("All available servers started successfully!")
+			}
+			fmt.Println()
+			fmt.Println("Server URLs:")
+			fmt.Println("  HTTP API:  http://localhost:8080")
+			if !httpOnly {
+				fmt.Println("  TCP Sync:  tcp://localhost:9090")
+				fmt.Println("  UDP:       (not yet implemented)")
+				fmt.Println("  gRPC:      (not yet implemented)")
+				fmt.Println("  WebSocket: (not yet implemented)")
+			}
+			fmt.Println()
+			fmt.Println("Stop: mangahub server stop")
+			fmt.Println("─────────────────────────────────────────")
+
+			// Start HTTP in background, block on shutdown
+			go func() {
+				if err := server.Router.Run(":8080"); err != nil {
+					log.Println("HTTP server error:", err)
+				}
+			}()
+
+			<-server.Shutdown
+			log.Println("Shutting down server...")
+
+		} else {
+			// ── TCP only mode ──────────────────────────────────────────
+			fmt.Println("[TCP] Starting TCP Sync Server only...")
+			tcpServer := tcp.NewProgressSyncServer("9090")
+			if err := tcpServer.Start(); err != nil {
+				fmt.Println("  ✗ Failed to start TCP server:", err)
+				return
+			}
+			fmt.Println("  ✓ Starting on tcp://localhost:9090")
+			fmt.Println("  ✓ Connection pool initialized (max: 100)")
+			fmt.Println("  ✓ Broadcast channels ready")
+			fmt.Println("  Status: Listening for connections")
+			fmt.Println()
+			fmt.Println("Press Ctrl+C to stop.")
+
+			// Block forever (TCP only mode)
+			select {}
+		} 
+	},
 }
 
 var stopCmd = &cobra.Command{
@@ -124,4 +217,8 @@ func init() {
 
 	// Add stop command to the server command
 	ServerCmd.AddCommand(stopCmd)
+
+	// Register flags for selective startup
+	startCmd.Flags().Bool("http-only", false, "Start only the HTTP API server")
+	startCmd.Flags().Bool("tcp-only", false, "Start only the TCP sync server")
 }

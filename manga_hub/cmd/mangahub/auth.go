@@ -75,6 +75,19 @@ var loginCmd = &cobra.Command{
 		token := result["token"].(string)
 		os.WriteFile(".token", []byte(token), 0644)
 
+		// save session info for TCP sync
+		userIDVal, ok := result["user_id"].(string)
+		if !ok || userIDVal == "" {
+			fmt.Println("⚠️  Warning: could not save session (user_id missing from server response)")
+		} else {
+			session := map[string]string{
+				"user_id":  userIDVal,
+				"username": username,
+			}
+			sessionData, _ := json.Marshal(session)
+			os.WriteFile(".session", sessionData, 0644)
+		}
+
 		fmt.Printf("✅ Welcome back, %s!\n", username)
 	},
 }
