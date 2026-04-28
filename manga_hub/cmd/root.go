@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"go_mangahub/manga_hub/cmd/api-server"
+	apiserver "go_mangahub/manga_hub/cmd/api-server"
 	"go_mangahub/manga_hub/cmd/mangahub"
 	tcpserver "go_mangahub/manga_hub/cmd/tcp-server"
 
@@ -42,4 +42,10 @@ func init() {
 
 	// Add sync command to root command
 	rootCmd.AddCommand(tcpserver.SyncCmd)
+
+	// Add notify command to root command
+	rootCmd.AddCommand(mangahub.NotifyCmd)
+
+	// Add grpc command to root command
+	rootCmd.AddCommand(mangahub.GrpcCmd)
 }

@@ -82,4 +82,35 @@ func SetupRoutes(s *APIServer) {
 			}()
 		})
 	}
+
+	// Notification routes (protected routes)
+	notify := s.Router.Group("/notify")
+	{
+		notify.Use(middleware.ValidateMiddleware(s.JWTSecret))
+
+		notify.POST("/subscribe", controllers.Subscribe)
+		notify.POST("/unsubscribe", controllers.Unsubscribe)
+		notify.GET("/preferences", controllers.GetPreferences)
+		notify.POST("/test", controllers.TestNotification)
+	}
+
+	// gRPC routes (protected routes)
+	grpcRoutes := s.Router.Group("/grpc")
+	{
+		grpcRoutes.Use(middleware.ValidateMiddleware(s.JWTSecret))
+
+		// Manga routes (specific routes before parameterized routes)
+		grpcRoutes.GET("/manga/search", controllers.SearchManga)
+		grpcRoutes.GET("/manga/list", controllers.ListAllManga)
+		grpcRoutes.GET("/manga/stats/:id", controllers.GetMangaStats)
+		grpcRoutes.GET("/manga/:id", controllers.GetMangaByID)
+		grpcRoutes.POST("/manga/batch", controllers.BatchGetManga)
+
+		// Progress routes
+		grpcRoutes.POST("/progress/update", controllers.UpdateProgressGrpc)
+		grpcRoutes.GET("/progress", controllers.GetProgress)
+
+		// Service stats
+		grpcRoutes.GET("/stats", controllers.GetServiceStats)
+	}
 }
