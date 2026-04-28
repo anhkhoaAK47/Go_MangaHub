@@ -2,11 +2,18 @@ package apiserver
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"go_mangahub/manga_hub/internal/controllers"
+	internalgrpc "go_mangahub/manga_hub/internal/grpc"
+	"go_mangahub/manga_hub/internal/grpcpb"
+	"go_mangahub/manga_hub/internal/grpcserver"
 	"go_mangahub/manga_hub/internal/routes"
 	"go_mangahub/manga_hub/internal/tcp"
+	"go_mangahub/manga_hub/internal/udp"
 	"go_mangahub/manga_hub/pkg/database"
+	"go_mangahub/manga_hub/pkg/models"
+	"net"
 	"net/http"
 	"strings"
 
@@ -16,6 +23,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
+	"google.golang.org/grpc"
 )
 
 type APIServer struct {
@@ -23,6 +31,82 @@ type APIServer struct {
 	Database *sql.DB
 	JWTSecret string
 	Shutdown chan bool
+}
+
+func startGrpcServer(db *sql.DB, tcpBroadcaster *tcp.ProgressSyncServer) error {
+	lis, err := net.Listen("tcp", ":9092")
+	if err != nil {
+		return err
+	}
+
+	s := grpc.NewServer()
+	grpcpb.RegisterMangaServiceServer(s, grpcserver.New(db, tcpBroadcaster))
+
+	go func() {
+		if err := s.Serve(lis); err != nil {
+			log.Println("gRPC server error:", err)
+		}
+	}()
+	return nil
+}
+
+// preloadGrpcLegacyCache keeps the old in-memory gRPC service features working
+// (list/batch/stats/progress endpoints) without removing code.
+func preloadGrpcLegacyCache(db *sql.DB, svc *internalgrpc.GrpcService) (int, error) {
+	rows, err := db.Query(`SELECT id, title, author, artist, genres, status, year, total_chapters, total_volumes, serialization, publisher, description, my_anime_list, manga_dx FROM manga`)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	count := 0
+	for rows.Next() {
+		var (
+			id            string
+			title         string
+			author        string
+			artist        string
+			genresJSON    string
+			status        string
+			year          int
+			totalChapters int
+			totalVolumes  int
+			serialization string
+			publisher     string
+			description   string
+			myAnimeList   string
+			mangaDx       string
+		)
+
+		if err := rows.Scan(
+			&id, &title, &author, &artist, &genresJSON, &status, &year, &totalChapters, &totalVolumes, &serialization,
+			&publisher, &description, &myAnimeList, &mangaDx,
+		); err != nil {
+			continue
+		}
+
+		var genres []string
+		_ = json.Unmarshal([]byte(genresJSON), &genres)
+		m := &models.Manga{
+			ID:            id,
+			Title:         title,
+			Author:        author,
+			Artist:        artist,
+			Genres:        genres,
+			Status:        status,
+			Year:          year,
+			TotalChapters: totalChapters,
+			TotalVolumes:  totalVolumes,
+			Serialization: serialization,
+			Publisher:     publisher,
+			Description:   description,
+			MyAnimeList:   myAnimeList,
+			MangaDx:       mangaDx,
+		}
+		_ = svc.CacheManga(m)
+		count++
+	}
+	return count, nil
 }
 // subcommand "server"
 var ServerCmd = &cobra.Command{
@@ -76,6 +160,35 @@ var startCmd = &cobra.Command{
 	// Provide DB handle to controllers
 	controllers.SetDB(db)
 
+	// ── UDP Notification Manager (in-process) ───────────────────────
+	notifyManager := udp.NewNotificationManager(9091) // UDP port (per CLI manual/spec)
+	if err := notifyManager.Start(); err != nil {
+		fmt.Println("  ⚠ UDP notification service failed to start:", err)
+	} else {
+		controllers.InitializeNotifyManager(notifyManager)
+		fmt.Println("  ✅ UDP notification service initialized (udp://localhost:9091)")
+	}
+
+	// ── Legacy in-memory gRPC service (kept for extra endpoints) ─────
+	legacyGrpc := internalgrpc.NewGrpcService()
+	controllers.InitializeGrpcService(legacyGrpc)
+	if cached, err := preloadGrpcLegacyCache(db, legacyGrpc); err != nil {
+		fmt.Println("  ⚠ Legacy gRPC cache preload failed:", err)
+	} else {
+		fmt.Printf("  ✅ Legacy gRPC cache ready (cached mangas: %d)\n", cached)
+	}
+
+	// ── gRPC Internal Service (real grpc-go server) ─────────────────
+	if err := startGrpcServer(db, nil); err != nil {
+		fmt.Println("  ⚠ gRPC service failed to start:", err)
+	} else {
+		if err := controllers.InitializeGrpcClient("localhost:9092"); err != nil {
+			fmt.Println("  ⚠ gRPC client init failed:", err)
+		} else {
+			fmt.Println("  ✅ gRPC service initialized (grpc://localhost:9092)")
+		}
+	}
+
 	routes.SetupRoutes(server)
 
 	routesCount := len(server.Router.Routes())
@@ -100,14 +213,14 @@ var startCmd = &cobra.Command{
 				// ── [3/5] UDP Notification Server ─────────────────────────
 				fmt.Println()
 				fmt.Println("[3/5] UDP Notification Server")
-				fmt.Println("  ⚠ Not yet implemented")
-				fmt.Println("  Status: Skipped")
+				fmt.Println("  ✓ Running in-process")
+				fmt.Println("  Status: Listening (udp://localhost:9091)")
 
 				// ── [4/5] gRPC Internal Service ───────────────────────────
 				fmt.Println()
 				fmt.Println("[4/5] gRPC Internal Service")
-				fmt.Println("  ⚠ Not yet implemented")
-				fmt.Println("  Status: Skipped")
+				fmt.Println("  ✓ Running grpc-go server")
+				fmt.Println("  Status: Operational")
 
 				// ── [5/5] WebSocket Chat Server ───────────────────────────
 				fmt.Println()
@@ -132,8 +245,8 @@ var startCmd = &cobra.Command{
 			fmt.Println("  HTTP API:  http://localhost:8080")
 			if !httpOnly {
 				fmt.Println("  TCP Sync:  tcp://localhost:9090")
-				fmt.Println("  UDP:       (not yet implemented)")
-				fmt.Println("  gRPC:      (not yet implemented)")
+				fmt.Println("  UDP:       udp://localhost:9091")
+				fmt.Println("  gRPC:      grpc://localhost:9092 (HTTP bridge: http://localhost:8080/grpc/*)")
 				fmt.Println("  WebSocket: (not yet implemented)")
 			}
 			fmt.Println()

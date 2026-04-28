@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package mangahub.v1;
+
+option go_package = "go_mangahub/manga_hub/internal/grpcpb;grpcpb";
+
+service MangaService {
+  rpc GetManga(GetMangaRequest) returns (MangaResponse);
+  rpc SearchManga(SearchRequest) returns (SearchResponse);
+  rpc UpdateProgress(ProgressRequest) returns (ProgressResponse);
+}
+
+message GetMangaRequest {
+  string manga_id = 1;
+}
+
+message SearchRequest {
+  string query = 1;
+}
+
+message ProgressRequest {
+  string user_id = 1;
+  string manga_id = 2;
+  int32 chapter = 3;
+  string status = 4;
+}
+
+message MangaResponse {
+  string id = 1;
+  string title = 2;
+  string author = 3;
+  string artist = 4;
+  repeated string genres = 5;
+  string status = 6;
+  int32 year = 7;
+  int32 total_chapters = 8;
+  int32 total_volumes = 9;
+  string publisher = 10;
+  string description = 11;
+}
+
+message SearchResponse {
+  repeated MangaResponse mangas = 1;
+}
+
+message ProgressResponse {
+  string user_id = 1;
+  string manga_id = 2;
+  int32 chapter = 3;
+  string reading_status = 4;
+  int32 rating = 5;
+  string updated_at = 6;
+}
+
