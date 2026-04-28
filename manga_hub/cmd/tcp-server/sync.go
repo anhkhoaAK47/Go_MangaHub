@@ -30,7 +30,7 @@ var connectCmd = &cobra.Command{
 		_ = tokenData // token used for auth context
 
 		// laod user info from .session file
-		userID, username := loadUserSession()
+		userID, username, sessionID := loadUserSession()
 		if userID == "" {
 			fmt.Println("❌ Could not load user session. Please login again.")
 			return
@@ -53,7 +53,8 @@ var connectCmd = &cobra.Command{
 		reg := map[string]string{
 			"user_id": userID,
 			"username": username,
-			"device": "cli",
+			"session_id": sessionID,
+			"device": "web",
 		}
 
 		regData, _ := json.Marshal(reg)
@@ -75,7 +76,8 @@ var connectCmd = &cobra.Command{
 		fmt.Printf("\nConnection Details:\n")
 		fmt.Printf("  Server:     tcp://localhost:9090\n")
 		fmt.Printf("  User:       %s\n", username)
-		fmt.Printf("  Connected:  %s\n", time.Now().Format("2006-01-02 15:04:05"))
+		fmt.Printf("  Session ID: %s\n", sessionID)
+		fmt.Printf("  Connected at:  %s\n", time.Now().Format("2006-01-02 15:04:05"))
 		fmt.Printf("\nReal-time sync is now active. Listening for updates...\n")
 		fmt.Printf("Press Ctrl+C to disconnect.\n\n")
 
@@ -140,7 +142,7 @@ var monitorCmd = &cobra.Command{
 	Short: "Watch real-time sync updates from all devices",
 	Run: func(cmd *cobra.Command, args []string) {
 		// verify user session
-		userID, username := loadUserSession()
+		userID, username, sessionID  := loadUserSession()
 		if userID == "" {
 			fmt.Println("❌ Not logged in. Please run: mangahub auth login --username <username>")
 			return
@@ -160,6 +162,7 @@ var monitorCmd = &cobra.Command{
 		reg := map[string]string{
 			"user_id": userID,
 			"username": username,
+			"session_id": sessionID,
 			"device": "monitor",
 		}
 		regData, _ := json.Marshal(reg)
@@ -184,9 +187,14 @@ var monitorCmd = &cobra.Command{
 			}
 
 			ts := time.Now().Format("15:04:05")
-			fmt.Printf("[%s] ← %s updated: %s → Chapter %.0f\n",
+			fmt.Printf("[%s] → Broadcasting update: %s → Chapter %.0f\n",
 				ts,
-				update["username"],
+				update["manga_id"],
+				update["chapter"],
+			)
+			fmt.Printf("[%s] ← Device '%s' updated: %s → Chapter %.0f\n",
+				ts,
+				update["device"],
 				update["manga_id"],
 				update["chapter"],
 			)
@@ -195,18 +203,18 @@ var monitorCmd = &cobra.Command{
 }
 
 
-func loadUserSession() (string, string) {
+func loadUserSession() (string, string, string) {
 	data, err := os.ReadFile(".session")
 	if err != nil {
-		return "", ""
+		return "", "", ""
 	}
 
 	var session map[string]string
 	if err := json.Unmarshal(data, &session); err != nil {
-		return "", ""
+		return "", "", ""
 	}
 
-	return session["user_id"], session["username"]
+	return session["user_id"], session["username"], session["session_id"]
 }
 
 

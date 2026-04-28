@@ -347,10 +347,17 @@ func UpdateProgress(c *gin.Context) {
 
 	tcpStatus := "Not connected"
 	if tcpServer != nil {
+
+		var username string
+		db.QueryRow("SELECT username FROM users WHERE id = ?", userID).Scan(&username)
+
 		tcpServer.BroadcastUpdate(tcp.ProgressUpdate{
+			Username: username,
 			UserID: userID,
 			MangaID: req.MangaID,
 			Chapter: req.Chapter,
+			Device: "cli",
+			SessionID: "HTTP_CLIENT_REQ",
 			Timestamp: now.Unix(),
 		})
 

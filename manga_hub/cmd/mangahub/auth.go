@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"go_mangahub/manga_hub/pkg/models"
+	"go_mangahub/manga_hub/pkg/utils"
 	"io"
 	"net/http"
 	"os"
 
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"gitlab.com/david_mbuvi/go_asterisks" // pkg to hide password input
 )
@@ -74,21 +76,36 @@ var loginCmd = &cobra.Command{
 
 		token := result["token"].(string)
 		os.WriteFile(".token", []byte(token), 0644)
+		
+		// get token exp date
+		_, tokenExp := utils.LoadUserToken()
+
 
 		// save session info for TCP sync
 		userIDVal, ok := result["user_id"].(string)
 		if !ok || userIDVal == "" {
 			fmt.Println("⚠️  Warning: could not save session (user_id missing from server response)")
-		} else {
-			session := map[string]string{
-				"user_id":  userIDVal,
-				"username": username,
-			}
-			sessionData, _ := json.Marshal(session)
-			os.WriteFile(".session", sessionData, 0644)
+		} 
+		
+		// generate a unique sessionID
+		sessionID := uuid.New().String()
+
+		session := map[string]string{
+			"user_id":  userIDVal,
+			"username": username,
+			"session_id": sessionID,
 		}
+		sessionData, _ := json.Marshal(session)
+		os.WriteFile(".session", sessionData, 0644)
+		
 
 		fmt.Printf("✅ Welcome back, %s!\n", username)
+		fmt.Println()
+		fmt.Println("Session Details:")
+		fmt.Printf("	Token expires: %s", tokenExp)
+		fmt.Println("	Permissions: read, write, sync")
+
+		fmt.Println("Ready to use MangaHub! Try: mangahub manga search \"your favorite manga\"")
 	},
 }
 
@@ -165,6 +182,7 @@ var logoutCmd = &cobra.Command{
 		}
 
 		os.Remove(".token")
+		os.Remove(".session")
 		fmt.Println("✅ Logged out successfully and session cleared.")
 	},
 }

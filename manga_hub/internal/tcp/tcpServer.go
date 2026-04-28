@@ -17,13 +17,16 @@ type ProgressUpdate struct {
 	MangaID   string `json:"manga_id"`
 	Chapter   int    `json:"chapter"`
 	Timestamp int64  `json:"timestamp"`
+	Device	  string `json:"device"`
+	SessionID string `json:"session_id"`
 }
 
 type Client struct {
-	Conn net.Conn
-	UserID string
-	Username string
-	Device string
+	Conn 		net.Conn
+	UserID 		string
+	Username 	string
+	Device 		string
+	SessionID 	string
 }
 
 
@@ -41,6 +44,7 @@ type RegisterMessage struct {
 	UserID   string `json:"user_id"`
 	Username string `json:"username"`
 	Device   string `json:"device"`
+	SessionID string `json:"session_id"` 
 }
 
 
@@ -98,16 +102,16 @@ func (s *ProgressSyncServer) runHub() {
 		select {
 		case client := <-s.Register:
 			s.mu.Lock()
-			s.clients[client.UserID] = client
+			s.clients[client.SessionID] = client
 			s.mu.Unlock()
 			log.Printf("[TCP] Client connected: %s (%s)\n", client.Username, client.Device)
 
-		case userID := <-s.Unregister:
+		case sessionID := <-s.Unregister:
 			s.mu.Lock()
-			if client, ok := s.clients[userID]; ok {
+			if client, ok := s.clients[sessionID]; ok {
 				client.Conn.Close()
-				delete(s.clients, userID)
-				log.Printf("[TCP] Client disconnected: %s\n", userID)
+				delete(s.clients, sessionID)
+				log.Printf("[TCP] Client disconnected: %s\n", client.Username)
 			}
 			s.mu.Unlock()
 
@@ -115,7 +119,7 @@ func (s *ProgressSyncServer) runHub() {
 			s.mu.RLock()
 			for _, client := range s.clients {
 				// Broadcast to all OTHER users (not the sender)
-				if client.UserID == update.UserID {
+				if client.SessionID == update.SessionID {
 					continue
 				}
 				data, _ := json.Marshal(update)
@@ -166,11 +170,12 @@ func(s *ProgressSyncServer) handleClient(conn net.Conn) {
 		UserID: reg.UserID,
 		Username: reg.Username,
 		Device: reg.Device,
+		SessionID: reg.SessionID,
 	}
 	// register client
 	s.Register <- client
 	defer func() {
-		s.Unregister <- client.UserID // unregister client in case things go wrong
+		s.Unregister <- client.SessionID // unregister sessionID in case things go wrong
 	}()
 
 	// send welcome acknowledgement
@@ -194,6 +199,8 @@ func(s *ProgressSyncServer) handleClient(conn net.Conn) {
 
 		update.UserID = client.UserID
 		update.Username = client.Username
+		update.SessionID = client.SessionID
+		update.Device = client.Device
 		update.Timestamp = time.Now().Unix()
 
 		log.Printf("[TCP] Progress update from %s: %s → ch.%d\n",

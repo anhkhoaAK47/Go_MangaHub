@@ -205,6 +205,8 @@ var stopCmd = &cobra.Command{
 
 		if resp.StatusCode == http.StatusOK {
 			fmt.Println("✅ Server shutdown successfully.")
+			os.Remove(".session")
+			os.Remove(".token")
 		} else {
 			fmt.Printf("❌ Server responded with status code: %d\n", resp.StatusCode)
 		}
