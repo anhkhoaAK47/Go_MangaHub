@@ -9,3 +9,6 @@ mangahub.db
 
 # Ignore sessions
 *.session
+
+# Ignore tcp_connections
+*.tcp_connected
