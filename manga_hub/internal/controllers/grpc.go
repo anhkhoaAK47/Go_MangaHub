@@ -41,7 +41,7 @@ func InitializeGrpcService(service *internalgrpc.GrpcService) {
 
 // GetMangaByID retrieves a manga by ID via gRPC
 func GetMangaByID(c *gin.Context) {
-	userID := c.GetString("userID")
+	userID := c.GetString("user_id")
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
@@ -83,7 +83,7 @@ func GetMangaByID(c *gin.Context) {
 
 // SearchManga searches for manga via gRPC
 func SearchManga(c *gin.Context) {
-	userID := c.GetString("userID")
+	userID := c.GetString("user_id")
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
@@ -127,7 +127,7 @@ func SearchManga(c *gin.Context) {
 
 // UpdateProgressGrpc updates user progress via gRPC
 func UpdateProgressGrpc(c *gin.Context) {
-	userID := c.GetString("userID")
+	userID := c.GetString("user_id")
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
@@ -175,7 +175,7 @@ func UpdateProgressGrpc(c *gin.Context) {
 
 // GetProgress retrieves user progress (legacy in-memory implementation)
 func GetProgress(c *gin.Context) {
-	userID := c.GetString("userID")
+	userID := c.GetString("user_id")
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
@@ -211,7 +211,7 @@ func GetProgress(c *gin.Context) {
 
 // ListAllManga lists all manga (legacy in-memory implementation)
 func ListAllManga(c *gin.Context) {
-	userID := c.GetString("userID")
+	userID := c.GetString("user_id")
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
@@ -258,7 +258,7 @@ func GetServiceStats(c *gin.Context) {
 
 // BatchGetManga retrieves multiple manga (legacy in-memory implementation)
 func BatchGetManga(c *gin.Context) {
-	userID := c.GetString("userID")
+	userID := c.GetString("user_id")
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return

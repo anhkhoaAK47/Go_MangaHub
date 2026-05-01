@@ -17,7 +17,7 @@ func InitializeNotifyManager(manager *udp.NotificationManager) {
 
 // Subscribe handles subscription to notifications
 func Subscribe(c *gin.Context) {
-	userID := c.GetString("userID")
+	userID := c.GetString("user_id")
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
@@ -59,7 +59,7 @@ func Subscribe(c *gin.Context) {
 
 // Unsubscribe handles unsubscription from notifications
 func Unsubscribe(c *gin.Context) {
-	userID := c.GetString("userID")
+	userID := c.GetString("user_id")
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
@@ -101,7 +101,7 @@ func Unsubscribe(c *gin.Context) {
 
 // GetPreferences retrieves user notification preferences
 func GetPreferences(c *gin.Context) {
-	userID := c.GetString("userID")
+	userID := c.GetString("user_id")
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
@@ -138,7 +138,7 @@ func GetPreferences(c *gin.Context) {
 
 // TestNotification sends a test notification
 func TestNotification(c *gin.Context) {
-	userID := c.GetString("userID")
+	userID := c.GetString("user_id")
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
