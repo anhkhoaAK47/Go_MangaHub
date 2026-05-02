@@ -92,6 +92,7 @@ func SetupRoutes(s *APIServer) {
 		notify.POST("/unsubscribe", controllers.Unsubscribe)
 		notify.GET("/preferences", controllers.GetPreferences)
 		notify.POST("/test", controllers.TestNotification)
+		notify.POST("/new-chapter", controllers.NotifyNewChapter)
 	}
 
 	// gRPC routes (protected routes)
