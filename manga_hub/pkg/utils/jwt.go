@@ -9,9 +9,10 @@ import (
 )
 
 
-func GenerateJWT(userID string, secret string) (string, error) {
+func GenerateJWT(userID string, username string, secret string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": userID,
+		"username": username,
 		"exp": time.Now().Add(time.Hour * 24).Unix(),
 	})
 

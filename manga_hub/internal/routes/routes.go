@@ -6,6 +6,7 @@ import (
 	"go_mangahub/manga_hub/internal/auth"
 	"go_mangahub/manga_hub/internal/controllers"
 	"go_mangahub/manga_hub/internal/middleware"
+	"go_mangahub/manga_hub/internal/websocket"
 
 	"github.com/gin-gonic/gin"
 )
@@ -15,6 +16,7 @@ type APIServer struct {
 	Database  *sql.DB
 	JWTSecret string
 	Shutdown  chan bool
+	ChatHub   *websocket.ChatHub
 }
 
 func SetupRoutes(s *APIServer) {
@@ -113,4 +115,16 @@ func SetupRoutes(s *APIServer) {
 		// Service stats
 		grpcRoutes.GET("/stats", controllers.GetServiceStats)
 	}
+}
+
+func SetupWSRoutes(s *APIServer) *gin.Engine {
+	wsRouter := gin.New()
+	wsRouter.Use(gin.Recovery())
+
+	wsRouter.GET("/chat/:room",
+		middleware.ValidateMiddleware(s.JWTSecret),
+		websocket.HandleChatRoom(s.ChatHub, s.Database),
+	)
+
+	return wsRouter
 }

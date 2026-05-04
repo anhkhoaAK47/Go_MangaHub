@@ -130,9 +130,9 @@ func HandleLogin(c *gin.Context, db *sql.DB, jwtSecret string) {
 		})
 		return
 	}
-
+	
 	// Generate token
-	token, err := utils.GenerateJWT(userID, jwtSecret)
+	token, err := utils.GenerateJWT(userID, req.Username,jwtSecret)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
@@ -147,7 +147,7 @@ func HandleLogin(c *gin.Context, db *sql.DB, jwtSecret string) {
 		"username": req.Username,
 		"user_id": userID,
 		"token": token,
-		"expires_at": time.Now().Add(time.Hour * 24),
+		"expires_at": time.Now().Add(time.Hour * 24).Format("2006-01-02 15:04:05 UTC"),
 	})
 }
 // ADDED: HandleLogout controller

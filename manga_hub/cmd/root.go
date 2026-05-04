@@ -48,4 +48,7 @@ func init() {
 
 	// Add grpc command to root command
 	rootCmd.AddCommand(mangahub.GrpcCmd)
+
+	// Add chat command to root command
+	rootCmd.AddCommand(mangahub.ChatCmd)
 }

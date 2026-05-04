@@ -69,8 +69,18 @@ func ValidateMiddleware(secret string) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+
+		username, exists := claims["username"].(string)
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "Username not found in token",
+			})
+			c.Abort()
+			return 
+		}
 		
 		c.Set("user_id", userID)
+		c.Set("username", username)
 		c.Next()
 	}
 }

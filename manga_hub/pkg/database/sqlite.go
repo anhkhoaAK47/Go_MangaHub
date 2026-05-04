@@ -56,6 +56,14 @@ func InitDB(filepath string) (*sql.DB, error) {
 		notes TEXT DEFAULT '',
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
+	CREATE TABLE IF NOT EXISTS chat_messages (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		room_id TEXT NOT NULL,
+		user_id TEXT NOT NULL,
+		username TEXT NOT NULL,
+		message TEXT NOT NULL,
+		timestamp INTEGER NOT NULL
+	);
 	`
 	_, err = db.Exec(schema)
 	return db, err

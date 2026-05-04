@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"go_mangahub/manga_hub/pkg/models"
-	"go_mangahub/manga_hub/pkg/utils"
 	"io"
 	"net/http"
 	"os"
@@ -78,7 +77,10 @@ var loginCmd = &cobra.Command{
 		os.WriteFile(".token", []byte(token), 0644)
 		
 		// get token exp date
-		_, tokenExp := utils.LoadUserToken()
+		tokenExp, ok := result["expires_at"].(string)
+		if !ok {
+			tokenExp = "N/A" // if server can't get token exp
+		}
 
 
 		// save session info for TCP sync
@@ -102,7 +104,7 @@ var loginCmd = &cobra.Command{
 		fmt.Printf("✅ Welcome back, %s!\n", username)
 		fmt.Println()
 		fmt.Println("Session Details:")
-		fmt.Printf("	Token expires: %s", tokenExp)
+		fmt.Printf("	Token expires: %s\n", tokenExp)
 		fmt.Println("	Permissions: read, write, sync")
 
 		fmt.Println("Ready to use MangaHub! Try: mangahub manga search \"your favorite manga\"")
