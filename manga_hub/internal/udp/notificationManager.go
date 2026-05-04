@@ -332,3 +332,106 @@ func (nm *NotificationManager) TestNotification(userID string) (*Notification, e
 
 	return testNotif, nil
 }
+
+// NotifyNewChapter proactively pushes a "new chapter released" event to all
+// registered UDP clients whose preferences match the manga or genre.
+// It simulates a server-side push (UC-010 style) but with preference filtering.
+func (nm *NotificationManager) NotifyNewChapter(mangaID, mangaTitle string, chapterNum int, chapterTitle, genre string) (int, error) {
+	if mangaID == "" {
+		return 0, fmt.Errorf("mangaID is required")
+	}
+	if chapterNum <= 0 {
+		return 0, fmt.Errorf("chapterNum must be > 0")
+	}
+
+	nm.mu.RLock()
+	conn := nm.udpConn
+	if conn == nil {
+		nm.mu.RUnlock()
+		return 0, fmt.Errorf("UDP connection not initialized")
+	}
+
+	type target struct {
+		userID string
+		addr   *net.UDPAddr
+	}
+	targets := make([]target, 0, len(nm.clients))
+	for userID, prefs := range nm.preferences {
+		if prefs == nil || !prefs.NotificationsEnabled {
+			continue
+		}
+		addr := nm.clients[userID]
+		if addr == nil {
+			continue
+		}
+		if !matchesSubscription(prefs, mangaID, genre) {
+			continue
+		}
+		// Copy address value to avoid aliasing a map value that can be replaced.
+		addrCopy := *addr
+		targets = append(targets, target{userID: userID, addr: &addrCopy})
+	}
+	nm.mu.RUnlock()
+
+	if len(targets) == 0 {
+		return 0, nil
+	}
+
+	// Bound potential blocking in case of OS buffer pressure.
+	_ = conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
+	defer func() { _ = conn.SetWriteDeadline(time.Time{}) }()
+
+	sent := 0
+	var lastErr error
+	now := time.Now()
+
+	for _, t := range targets {
+		notif := &Notification{
+			ID:           fmt.Sprintf("notif-%d-%s-%s-%d", now.UnixNano(), t.userID, mangaID, chapterNum),
+			UserID:       t.userID,
+			MangaID:      mangaID,
+			MangaTitle:   mangaTitle,
+			ChapterNum:   chapterNum,
+			ChapterTitle: chapterTitle,
+			Genre:        genre,
+			Timestamp:    now,
+			Message:      fmt.Sprintf("New chapter released: %s - Chapter %d", mangaTitle, chapterNum),
+		}
+
+		b, err := json.Marshal(notif)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if _, err := conn.WriteToUDP(b, t.addr); err != nil {
+			lastErr = err
+			continue
+		}
+		sent++
+	}
+
+	if sent == 0 && lastErr != nil {
+		return 0, lastErr
+	}
+	return sent, lastErr
+}
+
+func matchesSubscription(prefs *NotificationPreferences, mangaID, genre string) bool {
+	if prefs == nil {
+		return false
+	}
+	for _, m := range prefs.SubscribedMangas {
+		if m == mangaID {
+			return true
+		}
+	}
+	if genre == "" {
+		return false
+	}
+	for _, g := range prefs.SubscribedGenres {
+		if g == genre {
+			return true
+		}
+	}
+	return false
+}

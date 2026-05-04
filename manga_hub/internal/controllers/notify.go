@@ -1,7 +1,10 @@
 package controllers
 
 import (
+	"database/sql"
+	"encoding/json"
 	"net/http"
+	"strings"
 
 	"go_mangahub/manga_hub/internal/udp"
 
@@ -186,5 +189,79 @@ func TestNotification(c *gin.Context) {
 			"message":       testNotif.Message,
 			"timestamp":     testNotif.Timestamp,
 		},
+	})
+}
+
+type notifyNewChapterRequest struct {
+	MangaID      string `json:"manga_id"`
+	ChapterNum   int    `json:"chapter_num"`
+	ChapterTitle string `json:"chapter_title"`
+	Genre        string `json:"genre,omitempty"`
+}
+
+// NotifyNewChapter triggers a server-side push event to matching subscribers.
+// This is a control endpoint to simulate "a new chapter was released".
+func NotifyNewChapter(c *gin.Context) {
+	if notifyManager == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Notification service not available"})
+		return
+	}
+	if db == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Database not available"})
+		return
+	}
+
+	var req notifyNewChapterRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+	req.MangaID = strings.TrimSpace(req.MangaID)
+	req.ChapterTitle = strings.TrimSpace(req.ChapterTitle)
+	req.Genre = strings.TrimSpace(req.Genre)
+	if req.MangaID == "" || req.ChapterNum <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "manga_id and chapter_num (>0) are required"})
+		return
+	}
+
+	var (
+		title      string
+		genresJSON string
+	)
+	err := db.QueryRow(`SELECT title, genres FROM manga WHERE id = ?`, req.MangaID).Scan(&title, &genresJSON)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "manga not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// If caller didn't specify genre, pick first genre from DB (if any).
+	if req.Genre == "" && genresJSON != "" {
+		var genres []string
+		_ = json.Unmarshal([]byte(genresJSON), &genres)
+		if len(genres) > 0 {
+			req.Genre = genres[0]
+		}
+	}
+
+	sent, pushErr := notifyManager.NotifyNewChapter(req.MangaID, title, req.ChapterNum, req.ChapterTitle, req.Genre)
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":          "success",
+		"manga_id":        req.MangaID,
+		"manga_title":     title,
+		"chapter_num":     req.ChapterNum,
+		"chapter_title":   req.ChapterTitle,
+		"genre":           req.Genre,
+		"notified_clients": sent,
+		"udp_error": func() any {
+			if pushErr == nil {
+				return nil
+			}
+			return pushErr.Error()
+		}(),
 	})
 }
