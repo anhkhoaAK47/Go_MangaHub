@@ -116,6 +116,13 @@ func SetupRoutes(s *APIServer) {
 		// Service stats
 		grpcRoutes.GET("/stats", controllers.GetServiceStats)
 	}
+
+	chatRoutes := s.Router.Group("/chat")
+	{
+		chatRoutes.Use(middleware.ValidateMiddleware(s.JWTSecret))
+		chatRoutes.GET("/history", controllers.GetChatHistory)
+	}	
+
 }
 
 func SetupWSRoutes(s *APIServer) *gin.Engine {

@@ -2,6 +2,7 @@ package websocket
 
 import (
 	"database/sql"
+	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
@@ -92,7 +93,42 @@ func handleMessages(hub *ChatHub, client *ClientConnection, conn *websocket.Conn
 		}
 
 		text := strings.TrimSpace(string(rawMsg))
+		log.Printf("[WS] Received from %s: '%s'\n", client.Username, text)
+
 		if text == "" {
+			continue
+		}
+
+		// /pm command
+		if strings.HasPrefix(text, "/pm") {
+			parts := strings.Fields(text)
+			if len(parts) >= 3 {
+				hub.privateMsg <- &PrivateMessage{
+					Sender: client,
+					Recipient: parts[1],
+					Message: []byte(strings.Join(parts[2:], " ")),
+				}
+			}
+			continue
+		}
+
+		// /users command
+		if text == "/users" {
+			respChan := make(chan []UserInfo)
+
+			// send request to the hub
+			hub.userListReq <- &UserListRequest{
+				Response: respChan,
+			}
+
+			// wait for answer and send to client
+			users := <- respChan
+			userData, _ := json.Marshal(users)
+
+			sendToClient(conn, ChatMessage{
+				Type:    "user_list",
+				Message: string(userData),
+			})
 			continue
 		}
 

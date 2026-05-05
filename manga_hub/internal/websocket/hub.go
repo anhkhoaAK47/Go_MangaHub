@@ -121,6 +121,14 @@ func (h *ChatHub) runHub() {
 				h.broadcastToRoom(msg.RoomID, msg, nil)
 			}
 
+		// user sends private message
+		case pm := <- h.privateMsg:
+			h.handlePrivateMessage(pm)
+
+		
+		case req := <- h.userListReq:
+			h.handleUserList(req)
+		
 		case <- h.quit:
 			return
 		}
@@ -161,4 +169,62 @@ func sendToClient(conn *websocket.Conn, msg ChatMessage) {
 	if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
 		log.Printf("[WS] Write error: %v\n", err)
 	}
+}
+
+func (h* ChatHub) handlePrivateMessage(pm *PrivateMessage) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	found := false
+	for _, room := range h.Rooms {
+		room.mu.RLock()
+		for conn, client := range room.Clients {
+			if client.Username == pm.Recipient {
+				// create "pm" type message
+				privateMsg := ChatMessage{
+					Type: "pm",
+					Username: pm.Sender.Username,
+					Message: string(pm.Message),
+					Timestamp: time.Now().Unix(),
+				}
+				sendToClient(conn, privateMsg)
+				found = true
+			}
+		}
+		room.mu.RUnlock()
+		if found {
+			break
+		}
+	}
+	if !found {
+		// error handling
+		sendToClient(pm.Sender.Conn, ChatMessage{
+			Type: "system",
+			Message: "User " + pm.Recipient + " not found.",
+		})
+	}
+}
+
+
+func (h *ChatHub) handleUserList(req *UserListRequest) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	var allUsers []UserInfo
+
+	// loop through every room in the hub
+	for _, room := range h.Rooms {
+		room.mu.RLock()
+		// loop through every client in that specific room
+		for _, client := range room.Clients {
+			allUsers = append(allUsers, UserInfo{
+				Username: client.Username,
+				RoomName: room.Name,
+			})
+		}
+		room.mu.RUnlock()
+	}
+
+	// send the full list back to the requester
+	req.Response <- allUsers
 }

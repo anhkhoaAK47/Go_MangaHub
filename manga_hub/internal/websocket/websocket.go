@@ -17,6 +17,8 @@ type ChatHub struct {
 	Unregister		chan *websocket.Conn
 	DB				*sql.DB
 	quit			chan bool
+	privateMsg		chan *PrivateMessage
+	userListReq		chan *UserListRequest
 }
 
 // message structure
@@ -27,6 +29,22 @@ type ChatMessage struct {
 	Timestamp	int64  `json:"timestamp"`
 	RoomID		string `json:"room_id"`
 	Type		string `json:"type"` // message, dm, join, leave, history
+}
+
+// private message structure
+type PrivateMessage struct {
+	Sender		*ClientConnection
+	Recipient	string
+	Message		[]byte
+}
+
+type UserInfo struct {
+	Username string
+	RoomName string
+}
+
+type UserListRequest struct {
+	Response chan []UserInfo
 }
 
 // holds websocket connection
@@ -56,6 +74,8 @@ func NewChatHub(db *sql.DB) *ChatHub {
 		Unregister: make(chan *websocket.Conn),
 		DB: db,
 		quit: make(chan bool),
+		privateMsg: make(chan *PrivateMessage),
+		userListReq: make(chan *UserListRequest),
 	}
 
 	// default chat room
