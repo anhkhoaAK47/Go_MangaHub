@@ -51,4 +51,7 @@ func init() {
 
 	// Add chat command to root command
 	rootCmd.AddCommand(mangahub.ChatCmd)
+
+	// Add stats command to root command
+	rootCmd.AddCommand(mangahub.StatsCmd)
 }

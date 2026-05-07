@@ -67,6 +67,12 @@ func SetupRoutes(s *APIServer) {
 		users.GET("/progress/history", controllers.GetProgressHistory)
 		users.POST("/progress/sync", controllers.SyncProgress)
 		users.GET("/progress/sync-status", controllers.SyncProgressStatus)
+		users.GET("/stats/overview", func(c *gin.Context) {
+			controllers.GetStatsOverview(c, s.Database)
+		})
+		users.GET("/stats/detailed", func(c *gin.Context) {
+			controllers.GetStatsDetailed(c, s.Database)
+		})
 	}
 
 	// server routes (protected routes)
