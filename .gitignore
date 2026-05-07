@@ -12,3 +12,6 @@ mangahub.db
 
 # Ignore tcp_connections
 *.tcp_connected
+
+# Ignore .server_start
+*.server_start
