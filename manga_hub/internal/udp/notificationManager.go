@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 )
@@ -11,11 +12,11 @@ import (
 // NotificationPreferences stores user notification preferences
 type NotificationPreferences struct {
 	UserID               string
-	SubscribedGenres     []string
 	SubscribedMangas     []string
 	NotificationsEnabled bool
 	EmailNotifications   bool
 	UpdatedAt            time.Time
+	LastUpdatedMangas    []string
 }
 
 // NotificationManager handles UDP-based notifications
@@ -152,15 +153,22 @@ func (nm *NotificationManager) Subscribe(userID string, mangaID string, genre st
 	nm.mu.Lock()
 	defer nm.mu.Unlock()
 
+	// Normalize inputs: trim whitespace to avoid storing empty-looking values
+	mangaID = strings.TrimSpace(mangaID)
+
+	if mangaID == "" {
+		return fmt.Errorf("mangaID is required")
+	}
+
 	prefs, exists := nm.preferences[userID]
 	if !exists {
 		prefs = &NotificationPreferences{
 			UserID:               userID,
-			SubscribedGenres:     []string{},
 			SubscribedMangas:     []string{},
 			NotificationsEnabled: true,
 			EmailNotifications:   true,
 			UpdatedAt:            time.Now(),
+			LastUpdatedMangas:    []string{},
 		}
 		nm.preferences[userID] = prefs
 	}
@@ -173,16 +181,6 @@ func (nm *NotificationManager) Subscribe(userID string, mangaID string, genre st
 			}
 		}
 		prefs.SubscribedMangas = append(prefs.SubscribedMangas, mangaID)
-	}
-
-	// Add genre subscription
-	if genre != "" {
-		for _, g := range prefs.SubscribedGenres {
-			if g == genre {
-				return fmt.Errorf("already subscribed to genre %s", genre)
-			}
-		}
-		prefs.SubscribedGenres = append(prefs.SubscribedGenres, genre)
 	}
 
 	prefs.UpdatedAt = time.Now()
@@ -204,16 +202,6 @@ func (nm *NotificationManager) Unsubscribe(userID string, mangaID string, genre 
 		for i, m := range prefs.SubscribedMangas {
 			if m == mangaID {
 				prefs.SubscribedMangas = append(prefs.SubscribedMangas[:i], prefs.SubscribedMangas[i+1:]...)
-				break
-			}
-		}
-	}
-
-	// Remove genre subscription
-	if genre != "" {
-		for i, g := range prefs.SubscribedGenres {
-			if g == genre {
-				prefs.SubscribedGenres = append(prefs.SubscribedGenres[:i], prefs.SubscribedGenres[i+1:]...)
 				break
 			}
 		}
@@ -256,7 +244,7 @@ func (nm *NotificationManager) SendNotification(notification *Notification) erro
 		return fmt.Errorf("user %s has no registered UDP client", notification.UserID)
 	}
 
-	// Verify subscription match
+	// Verify subscription match (manga-only)
 	isSubscribed := false
 	for _, m := range prefs.SubscribedMangas {
 		if m == notification.MangaID {
@@ -264,17 +252,9 @@ func (nm *NotificationManager) SendNotification(notification *Notification) erro
 			break
 		}
 	}
-	if !isSubscribed {
-		for _, g := range prefs.SubscribedGenres {
-			if g == notification.Genre {
-				isSubscribed = true
-				break
-			}
-		}
-	}
 
 	if !isSubscribed {
-		return fmt.Errorf("user %s not subscribed to manga or genre", notification.UserID)
+		return fmt.Errorf("user %s not subscribed to manga", notification.UserID)
 	}
 
 	// Send notification to the registered UDP client
@@ -364,7 +344,15 @@ func (nm *NotificationManager) NotifyNewChapter(mangaID, mangaTitle string, chap
 		if addr == nil {
 			continue
 		}
-		if !matchesSubscription(prefs, mangaID, genre) {
+		// Match subscriptions by mangaID only (ignore genre for NotifyNewChapter)
+		isSubscribed := false
+		for _, m := range prefs.SubscribedMangas {
+			if m == mangaID {
+				isSubscribed = true
+				break
+			}
+		}
+		if !isSubscribed {
 			continue
 		}
 		// Copy address value to avoid aliasing a map value that can be replaced.
@@ -385,6 +373,7 @@ func (nm *NotificationManager) NotifyNewChapter(mangaID, mangaTitle string, chap
 	var lastErr error
 	now := time.Now()
 
+	notifiedUsers := make([]string, 0, len(targets))
 	for _, t := range targets {
 		notif := &Notification{
 			ID:           fmt.Sprintf("notif-%d-%s-%s-%d", now.UnixNano(), t.userID, mangaID, chapterNum),
@@ -395,7 +384,7 @@ func (nm *NotificationManager) NotifyNewChapter(mangaID, mangaTitle string, chap
 			ChapterTitle: chapterTitle,
 			Genre:        genre,
 			Timestamp:    now,
-			Message:      fmt.Sprintf("New chapter released: %s - Chapter %d", mangaTitle, chapterNum),
+			Message:      fmt.Sprintf("Manga %s has updated a new chapter", mangaTitle),
 		}
 
 		b, err := json.Marshal(notif)
@@ -408,6 +397,20 @@ func (nm *NotificationManager) NotifyNewChapter(mangaID, mangaTitle string, chap
 			continue
 		}
 		sent++
+		notifiedUsers = append(notifiedUsers, t.userID)
+	}
+
+	// Update preferences for users who were notified: set LastUpdatedMangas and UpdatedAt
+	if len(notifiedUsers) > 0 {
+		nm.mu.Lock()
+		for _, uid := range notifiedUsers {
+			if p, ok := nm.preferences[uid]; ok && p != nil {
+				// set to the manga title that was just updated
+				p.LastUpdatedMangas = []string{mangaTitle}
+				p.UpdatedAt = now
+			}
+		}
+		nm.mu.Unlock()
 	}
 
 	if sent == 0 && lastErr != nil {
@@ -425,17 +428,8 @@ func matchesSubscription(prefs *NotificationPreferences, mangaID, genre string) 
 			return true
 		}
 	}
-	if genre == "" {
-		return false
-	}
-	for _, g := range prefs.SubscribedGenres {
-		if g == genre {
-			return true
-		}
-	}
 	return false
 }
-
 
 // return number of registered UDP Clients
 func (nm *NotificationManager) ConnectedCount() int {

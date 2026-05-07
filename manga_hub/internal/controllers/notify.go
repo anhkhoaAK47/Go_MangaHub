@@ -3,8 +3,10 @@ package controllers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"go_mangahub/manga_hub/internal/udp"
 
@@ -27,19 +29,18 @@ func Subscribe(c *gin.Context) {
 	}
 
 	mangaID := c.GetHeader("X-Manga-ID")
-	genre := c.GetHeader("X-Genre")
 
 	if notifyManager == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Notification service not available"})
 		return
 	}
 
-	if mangaID == "" && genre == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Either manga-id or genre is required"})
+	if mangaID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "manga-id is required"})
 		return
 	}
 
-	err := notifyManager.Subscribe(userID, mangaID, genre)
+	err := notifyManager.Subscribe(userID, mangaID, "")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -52,9 +53,6 @@ func Subscribe(c *gin.Context) {
 
 	if mangaID != "" {
 		response["manga_id"] = mangaID
-	}
-	if genre != "" {
-		response["genre"] = genre
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -69,19 +67,18 @@ func Unsubscribe(c *gin.Context) {
 	}
 
 	mangaID := c.GetHeader("X-Manga-ID")
-	genre := c.GetHeader("X-Genre")
 
 	if notifyManager == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Notification service not available"})
 		return
 	}
 
-	if mangaID == "" && genre == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Either manga-id or genre is required"})
+	if mangaID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "manga-id is required"})
 		return
 	}
 
-	err := notifyManager.Unsubscribe(userID, mangaID, genre)
+	err := notifyManager.Unsubscribe(userID, mangaID, "")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -95,10 +92,8 @@ func Unsubscribe(c *gin.Context) {
 	if mangaID != "" {
 		response["manga_id"] = mangaID
 	}
-	if genre != "" {
-		response["genre"] = genre
-	}
 
+	
 	c.JSON(http.StatusOK, response)
 }
 
@@ -120,21 +115,38 @@ func GetPreferences(c *gin.Context) {
 		// Return default preferences if not found
 		prefs = &udp.NotificationPreferences{
 			UserID:               userID,
-			SubscribedGenres:     []string{},
 			SubscribedMangas:     []string{},
 			NotificationsEnabled: true,
 			EmailNotifications:   true,
+			UpdatedAt:            time.Now(),
+			LastUpdatedMangas:    []string{},
 		}
+	}
+
+	// Format subscribed mangas as comma-separated string
+	subscribed := ""
+	if len(prefs.SubscribedMangas) > 0 {
+		subscribed = strings.Join(prefs.SubscribedMangas, ", ")
+	}
+
+	// Format updated_at with list of last updated manga titles (if any)
+	updatedAtStr := prefs.UpdatedAt.Format(time.RFC3339)
+	if len(prefs.LastUpdatedMangas) > 0 {
+		// quote each manga name and join with comma
+		quoted := make([]string, 0, len(prefs.LastUpdatedMangas))
+		for _, m := range prefs.LastUpdatedMangas {
+			quoted = append(quoted, fmt.Sprintf("\"%s\"", m))
+		}
+		updatedAtStr = fmt.Sprintf("%s (updated: %s)", updatedAtStr, strings.Join(quoted, ", "))
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"preferences": gin.H{
 			"user_id":               userID,
-			"subscribed_genres":     prefs.SubscribedGenres,
-			"subscribed_mangas":     prefs.SubscribedMangas,
+			"subscribed_mangas":     subscribed,
 			"notifications_enabled": prefs.NotificationsEnabled,
 			"email_notifications":   prefs.EmailNotifications,
-			"updated_at":            prefs.UpdatedAt,
+			"updated_at":            updatedAtStr,
 		},
 	})
 }
@@ -171,8 +183,8 @@ func TestNotification(c *gin.Context) {
 	sendErr := notifyManager.SendNotification(testNotif)
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Test notification sent",
+		"status":             "success",
+		"message":            "Test notification sent",
 		"delivered_over_udp": sendErr == nil,
 		"udp_error": func() any {
 			if sendErr == nil {
@@ -250,12 +262,12 @@ func NotifyNewChapter(c *gin.Context) {
 	sent, pushErr := notifyManager.NotifyNewChapter(req.MangaID, title, req.ChapterNum, req.ChapterTitle, req.Genre)
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":          "success",
-		"manga_id":        req.MangaID,
-		"manga_title":     title,
-		"chapter_num":     req.ChapterNum,
-		"chapter_title":   req.ChapterTitle,
-		"genre":           req.Genre,
+		"status":           "success",
+		"manga_id":         req.MangaID,
+		"manga_title":      title,
+		"chapter_num":      req.ChapterNum,
+		"chapter_title":    req.ChapterTitle,
+		"genre":            req.Genre,
 		"notified_clients": sent,
 		"udp_error": func() any {
 			if pushErr == nil {
