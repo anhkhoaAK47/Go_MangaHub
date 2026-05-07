@@ -123,6 +123,9 @@ func SetupRoutes(s *APIServer) {
 		chatRoutes.GET("/history", controllers.GetChatHistory)
 	}	
 
+	s.Router.GET("/health", func(c *gin.Context) {
+		controllers.CheckHealth(c)
+	})
 }
 
 func SetupWSRoutes(s *APIServer) *gin.Engine {

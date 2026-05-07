@@ -17,7 +17,9 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"path/filepath"
 
+	"time"
 	"log"
 	"os"
 
@@ -25,6 +27,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type APIServer struct {
@@ -32,6 +35,12 @@ type APIServer struct {
 	Database *sql.DB
 	JWTSecret string
 	Shutdown chan bool
+}
+
+type dbInfo struct {
+	status 	string
+	size	string
+	tables	string
 }
 
 func startGrpcServer(db *sql.DB, tcpBroadcaster *tcp.ProgressSyncServer) error {
@@ -136,6 +145,13 @@ var startCmd = &cobra.Command{
 		
 	jwtSecret := os.Getenv("JWTSECRETKEY")
 	fmt.Println("Starting MangaHub Server Components...")
+	
+	home, _ := os.UserHomeDir()
+	mangahubDir := filepath.Join(home, ".mangahub")
+	os.MkdirAll(mangahubDir, 0755) // create dir if it doesn't exist
+	startTime := time.Now().Format(time.RFC3339)
+	os.WriteFile(filepath.Join(mangahubDir, "server_start"), []byte(startTime), 0644)
+
 	fmt.Println()
 
 	var db *sql.DB
@@ -393,18 +409,259 @@ var stopCmd = &cobra.Command{
 			fmt.Println("✅ Server shutdown successfully.")
 			os.Remove(".session")
 			os.Remove(".token")
+			
+			home, _ := os.UserHomeDir()
+			os.Remove(filepath.Join(home, ".mangahub", "server_start"))
 		} else {
 			fmt.Printf("❌ Server responded with status code: %d\n", resp.StatusCode)
 		}
 	},
 }
 
+
+var statusCmd = &cobra.Command{
+	Use: "status",
+	Short: "Check status of all server running",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("MangaHub Server Status")
+		fmt.Println()
+
+		// ── Table header ───────────────────────────────────────────────────
+		fmt.Printf("%-22s %-12s %-25s %-12s %s\n",
+			"Service", "Status", "Address", "Uptime", "Load")
+		fmt.Println(strings.Repeat("─", 85))
+
+		startTime := getServerStartTime()
+
+		// Probe each port
+
+		// HTTP API
+		httpStatus, httpLoad := probeHTTP()
+		printServiceRow("HTTP API", httpStatus, "localhost:8080", startTime, httpLoad)
+
+		// TCP Sync
+		tcpStatus, tcpLoad := probeTCP("9090")
+		printServiceRow("TCP Sync", tcpStatus, "localhost:9090", startTime, tcpLoad)
+
+		// UDP Notifications
+		udpStatus, udpLoad := probeUDP("9091")
+		printServiceRow("UDP Notifications", udpStatus, "localhost:9091", startTime, udpLoad)
+
+		// gRPC
+		grpcStatus, grpcLoad := probeTCP("9092")
+		printServiceRow("gRPC Internal", grpcStatus, "localhost:9092", startTime, grpcLoad)
+
+		// WebSocket
+		wsStatus, wsLoad := probeTCP("9093")
+		printServiceRow("WebSocket Chat", wsStatus, "localhost:9093", startTime, wsLoad)
+
+		// Overall health 
+		allOnline := httpStatus == "online" &&
+			tcpStatus == "online" &&
+			udpStatus == "online" &&
+			grpcStatus == "online" &&
+			wsStatus == "online"
+
+		fmt.Println()
+		if allOnline {
+			fmt.Println("Overall System Health: ✓ Healthy")
+		} else {
+			fmt.Println("Overall System Health: ⚠ Degraded")
+			fmt.Println()
+			fmt.Println("Issues Detected:")
+			if httpStatus != "online" {
+				fmt.Println("  ✗ HTTP API Server: Not reachable on port 8080")
+			}
+			if tcpStatus != "online" {
+				fmt.Println("  ✗ TCP Sync Server: Not reachable on port 9090")
+			}
+			if udpStatus != "online" {
+				fmt.Println("  ⚠ UDP Notifications: Not reachable on port 9091")
+			}
+			if grpcStatus != "online" {
+				fmt.Println("  ✗ gRPC Service: Not reachable on port 9092")
+			}
+			if wsStatus != "online" {
+				fmt.Println("  ✗ WebSocket Chat: Not reachable on port 9093")
+			}
+		}		
+
+		// Database
+		fmt.Println()
+		fmt.Println("Database:")
+		dbInfo := probeDatabaseInfo()
+
+		fmt.Printf("  Connection:	%s\n", dbInfo.status)
+		fmt.Printf("  Size:			%s\n", dbInfo.size)
+		fmt.Printf("  Tables:		%s\n", dbInfo.tables)
+
+
+		// System
+		fmt.Println()
+		fmt.Printf("Checked at: %s\n", time.Now().Format("2006-01-02 15:04:05"))	
+	},
+}
+
+// reads the start time from ".server_start" file
+func getServerStartTime() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+        return ""
+    }
+	
+    data, err := os.ReadFile(filepath.Join(home, ".mangahub", "server_start"))
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(string(data))
+}
+
+// prints one row of the status table
+func printServiceRow(service, status, address, startTime, load string) {
+	uptime := "-"
+	if startTime != "" && status == "online" {
+		uptime = formatUptime(startTime)
+	}
+	fmt.Printf("%-22s %-12s %-25s %-12s %s\n",
+		service, status, address, uptime, load)
+}
+
+// calculates uptime from a saved start time
+func formatUptime(startTimeStr string) string {
+	startTime, err := time.Parse(time.RFC3339, startTimeStr)
+	if err != nil {
+		return "─"
+	}
+	duration := time.Since(startTime)
+
+	hours := int(duration.Hours())
+	minutes := int(duration.Minutes()) % 60
+
+	if hours > 0 {
+		return fmt.Sprintf("%dh %dm", hours, minutes)
+	}
+	return fmt.Sprintf("%dm", minutes)
+}
+
+// check if HTTP server is up by hitting /health
+func probeHTTP() (string, string) {
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get("http://localhost:8080/health")
+	if err != nil {
+		return "✗ Offline", "─"
+	}
+	defer resp.Body.Close()
+	return "online", "HTTP active"
+}
+
+
+// check if a TCP Port is open
+func probeTCP(port string) (string, string) {
+	conn, err := net.DialTimeout("tcp", "localhost:"+port, 2 * time.Second)
+	if err != nil {
+		return "✗ Offline", "─"
+	}
+	conn.Close()
+	return "online", "active"
+}
+
+// sends a ping packet and waits for pong
+func probeUDP(port string) (string, string) {
+	addr, err := net.ResolveUDPAddr("udp", "localhost:" + port)
+	if err != nil {
+		return "✗ Offline", "─"
+	}
+
+	conn, err := net.DialUDP("udp", nil, addr)
+	if err != nil {
+		return "✗ Offline", "─"
+	}
+	defer conn.Close()
+
+	// send ping packet
+	ping := []byte(`{"type":"ping"}`)
+	conn.SetDeadline(time.Now().Add(2 * time.Second))
+	_, err = conn.Write(ping)
+	if err != nil {
+		return "✗ Offline", "─"
+	}
+
+	// wait for pong
+	buf := make([]byte, 256)
+	_, err = conn.Read(buf)
+	if err != nil {
+		return "✗ Offline", "─"
+	}
+
+	return "online", "active"
+}
+
+// check if local DB file exists and gets its size
+func probeDatabaseInfo() dbInfo {
+	dbPath := "./mangahub.db"
+	info, err := os.Stat(dbPath)
+	if err != nil {
+		return dbInfo{
+			status: "✗ Not found",
+			size:   "─",
+			tables: "─",		
+		}
+	}
+	
+	sizeMB := float64(info.Size()) / (1024 * 1024)
+	sizeStr := fmt.Sprintf("%.1f MB", sizeMB)
+
+	// count tables in db
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		return dbInfo{
+			status: "✗ Cannot open",
+			size:   sizeStr,
+			tables: "─",
+		}
+	}
+
+	defer db.Close()
+
+	rows, err := db.Query(`SELECT name FROM sqlite_master WHERE type='table' ORDER BY name`)
+	// database connected but no tables
+	if err != nil {
+		return dbInfo{
+			status: "✓ Active",
+			size:   sizeStr,
+			tables: "─",
+		}	
+	}
+
+	defer rows.Close()
+
+	// add tables name strings into array
+	var tableNames []string
+	for rows.Next() {
+		var name string
+		if rows.Scan(&name) == nil {
+			tableNames = append(tableNames, name)
+		}
+	}
+
+	return dbInfo{
+		status: "✓ Active",
+		size:   sizeStr,
+		tables: fmt.Sprintf("%d (%s)", len(tableNames), strings.Join(tableNames, ", ")),
+	}
+}
+
+
 func init() {
 	// Add start command to the server command
-	ServerCmd.AddCommand(startCmd) // 
+	ServerCmd.AddCommand(startCmd) 
 
 	// Add stop command to the server command
 	ServerCmd.AddCommand(stopCmd)
+
+	// Add status command to the server command
+	ServerCmd.AddCommand(statusCmd)
 
 	// Register flags for selective startup
 	startCmd.Flags().Bool("http-only", false, "Start only the HTTP API server")

@@ -435,3 +435,11 @@ func matchesSubscription(prefs *NotificationPreferences, mangaID, genre string) 
 	}
 	return false
 }
+
+
+// return number of registered UDP Clients
+func (nm *NotificationManager) ConnectedCount() int {
+	nm.mu.RLock()
+	defer nm.mu.RUnlock()
+	return len(nm.clients)
+}

@@ -186,3 +186,18 @@ func (h *ChatHub) GetOrCreateMangaRoom(mangaID string, db *sql.DB) (string, stri
 	h.createRoom(roomID, roomName)
 	return roomID, roomName
 }
+
+
+// get total users across all rooms
+func (h *ChatHub) ConnectedCount() int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	total := 0
+	for _, room := range h.Rooms {
+		room.mu.RLock()
+		total += len(room.Clients)
+		room.mu.RUnlock()
+	}
+	return total
+}
