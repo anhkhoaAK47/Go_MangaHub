@@ -148,6 +148,26 @@ var preferencesCmd = &cobra.Command{
 
 			if prefs, ok := preferences["preferences"].(map[string]interface{}); ok {
 				for key, value := range prefs {
+					// Skip keys we don't want to display
+					if key == "subscribed_genres" || key == "user_id" {
+						continue
+					}
+					// Format subscribed_mangas with commas when it's an array
+					if key == "subscribed_mangas" {
+						switch v := value.(type) {
+						case string:
+							fmt.Printf("  • %s: %s\n", key, v)
+						case []interface{}:
+							parts := make([]string, 0, len(v))
+							for _, it := range v {
+								parts = append(parts, fmt.Sprintf("%v", it))
+							}
+							fmt.Printf("  • %s: [%s]\n", key, strings.Join(parts, ", "))
+						default:
+							fmt.Printf("  • %s: %v\n", key, value)
+						}
+						continue
+					}
 					fmt.Printf("  • %s: %v\n", key, value)
 				}
 			} else {
