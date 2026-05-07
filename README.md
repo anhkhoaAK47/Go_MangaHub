@@ -205,6 +205,7 @@ mangahub notify subscribe    # Subscribe to chapter release notifications
 mangahub notify unsubscribe  # Unsubscribe
 mangahub notify preferences  # View notification settings
 mangahub notify test         # Test the notification system
+mangahub notify preferences  # View notification settings
 ```
  
 #### gRPC — Internal Service
