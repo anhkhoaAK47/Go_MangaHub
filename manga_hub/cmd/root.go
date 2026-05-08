@@ -54,4 +54,7 @@ func init() {
 
 	// Add stats command to root command
 	rootCmd.AddCommand(mangahub.StatsCmd)
+
+	// Add exports command to root command
+	rootCmd.AddCommand(mangahub.ExportCmd)
 }

@@ -15,3 +15,9 @@ mangahub.db
 
 # Ignore .server_start
 *.server_start
+
+# Ignore all json files
+*.json
+
+# Ignore all csv files
+*.csv

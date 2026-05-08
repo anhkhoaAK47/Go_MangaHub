@@ -73,6 +73,8 @@ func SetupRoutes(s *APIServer) {
 		users.GET("/stats/detailed", func(c *gin.Context) {
 			controllers.GetStatsDetailed(c, s.Database)
 		})
+		users.GET("/export/library", controllers.ListLibrary)
+		users.GET("/export/progress", controllers.GetProgressHistory)
 	}
 
 	// server routes (protected routes)
