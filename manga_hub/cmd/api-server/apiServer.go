@@ -379,13 +379,6 @@ var stopCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Stopping all servers...")
 
-		tokenData, err := os.ReadFile(".token")
-		if err != nil {
-			fmt.Println("❌ Not logged in. Run: mangahub auth login --username <username>")
-			return
-		}
-
-		token := strings.TrimSpace(string(tokenData))
 
 		// send POST request to server to shut down
 		client := http.Client{}
@@ -395,7 +388,6 @@ var stopCmd = &cobra.Command{
 			return
 		}
 
-		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")
 
 		resp, err := client.Do(req)
@@ -499,6 +491,26 @@ var statusCmd = &cobra.Command{
 		// System
 		fmt.Println()
 		fmt.Printf("Checked at: %s\n", time.Now().Format("2006-01-02 15:04:05"))	
+	},
+}
+
+var healthCmd = &cobra.Command{
+	Use: "health",
+	Short: "Check server health",
+	Run: func(cmd *cobra.Command, args []string) {
+		client := &http.Client{}
+		req, _ := http.NewRequest("GET", "http://localhost:8080/server/health", nil)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Println("❌ Error connecting to server")
+			return
+		}
+
+		if resp.StatusCode == http.StatusOK {
+			fmt.Println("✅ Server is running smoothly!")
+			return
+		}
 	},
 }
 
@@ -662,6 +674,9 @@ func init() {
 
 	// Add status command to the server command
 	ServerCmd.AddCommand(statusCmd)
+
+	// Add health command
+	ServerCmd.AddCommand(healthCmd)
 
 	// Register flags for selective startup
 	startCmd.Flags().Bool("http-only", false, "Start only the HTTP API server")

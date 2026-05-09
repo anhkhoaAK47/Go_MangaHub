@@ -80,8 +80,6 @@ func SetupRoutes(s *APIServer) {
 	// server routes (protected routes)
 	servers := s.Router.Group("/server")
 	{
-		servers.Use(middleware.ValidateMiddleware(s.JWTSecret))
-
 		servers.POST("/stop", func(c *gin.Context) {
 			c.JSON(200, gin.H{
 				"message": "Server shutting down...",
@@ -91,6 +89,9 @@ func SetupRoutes(s *APIServer) {
 				s.Shutdown <- true
 			}()
 		})
+		servers.GET("/health", func(c *gin.Context) {
+		controllers.CheckHealth(c)
+	})
 	}
 
 	// Notification routes (protected routes)
@@ -130,10 +131,6 @@ func SetupRoutes(s *APIServer) {
 		chatRoutes.Use(middleware.ValidateMiddleware(s.JWTSecret))
 		chatRoutes.GET("/history", controllers.GetChatHistory)
 	}	
-
-	s.Router.GET("/health", func(c *gin.Context) {
-		controllers.CheckHealth(c)
-	})
 }
 
 func SetupWSRoutes(s *APIServer) *gin.Engine {
