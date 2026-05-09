@@ -180,7 +180,29 @@ mangahub progress sync
 # Check sync status
 mangahub progress sync-status
 ```
- 
+
+### Statistics and Analytics
+```bash
+# View personal reading statistics
+mangahub stats overview
+
+# Detailed breakdown
+mangahub stats detailed
+
+
+```
+
+### Export Data
+```bash
+# Export library to JSON
+mangahub export library --format json --output library.json
+
+# Export reading progress
+mangahub export progress --format csv --output progress.csv
+
+# Full data export
+mangahub export all --output mangahub-backup.tar.gz
+```
 ---
 
 
@@ -201,8 +223,8 @@ mangahub sync monitor      # Watch real-time sync updates live
 mangahub notify subscribe    # Subscribe to chapter release notifications
 mangahub notify unsubscribe  # Unsubscribe
 mangahub notify preferences  # View notification settings
+mangahub notify listen       # Listen for chapter notifications
 mangahub notify test         # Test the notification system
-mangahub notify preferences  # View notification settings
 ```
  
 #### gRPC — Internal Service
@@ -224,10 +246,6 @@ mangahub chat join
  
 # Join a manga-specific discussion room
 mangahub chat join --manga-id one-piece
- 
-# Send a message
-mangahub chat send "Great chapter!"
-mangahub chat send "Loved this arc!" --manga-id one-piece
  
 # View chat history
 mangahub chat history
@@ -272,6 +290,9 @@ mangahub/
 ├── .env                    # Environment variables (not committed)
 ├── mangahub.db             # SQLite database (auto-created)
 ├── .token                  # Session token (auto-created on login)
+├── .session                # User session
+├── .udp_port               # UDP Port
+├── .server_start           # Server status   
 ├── go.mod
 ├── go.sum
 └── main.go
