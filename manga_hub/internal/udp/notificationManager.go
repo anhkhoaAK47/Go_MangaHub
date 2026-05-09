@@ -291,23 +291,25 @@ func (nm *NotificationManager) BroadcastNotification(notification *Notification)
 // TestNotification sends a test notification
 func (nm *NotificationManager) TestNotification(userID string) (*Notification, error) {
 	nm.mu.RLock()
-	_, exists := nm.preferences[userID]
+	prefs, exists := nm.preferences[userID]
 	nm.mu.RUnlock()
 
 	if !exists {
 		return nil, fmt.Errorf("user %s has no preferences", userID)
 	}
-
+	
+	mangaID := prefs.SubscribedMangas[0]
+	
 	testNotif := &Notification{
 		ID:           "test-notification-001",
 		UserID:       userID,
-		MangaID:      "test-manga-123",
+		MangaID:      mangaID,
 		MangaTitle:   "Test Manga Title",
 		ChapterNum:   1,
 		ChapterTitle: "Chapter 1: Getting Started",
 		Genre:        "Adventure",
 		Timestamp:    time.Now(),
-		Message:      "This is a test notification to verify your notification system is working properly",
+		Message:      "Test Notification Message",
 	}
 
 	return testNotif, nil

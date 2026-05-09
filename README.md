@@ -105,9 +105,6 @@ mangahub server status
 # Run detailed health check
 mangahub server health
  
-# Ping all server components
-mangahub server ping
-
 ```
 ---
 

@@ -21,3 +21,6 @@ mangahub.db
 
 # Ignore all csv files
 *.csv
+
+# Ignore udp port
+*.udp_port
