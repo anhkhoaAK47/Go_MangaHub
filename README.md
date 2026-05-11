@@ -96,7 +96,7 @@ E.g.: "C:\Go_MangaHub\manga_hub"
 # Start all server components (HTTP, TCP, UDP, gRPC, WebSocket)
 mangahub server start
  
-# Stop all running servers (requires login)
+# Stop all running servers
 mangahub server stop
 
 # Check status of all servers
