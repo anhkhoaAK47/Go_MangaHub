@@ -16,31 +16,31 @@ import (
 	"go_mangahub/manga_hub/pkg/models"
 	"net"
 	"net/http"
-	"strings"
 	"path/filepath"
+	"strings"
 
-	"time"
 	"log"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 type APIServer struct {
-	Router *gin.Engine
-	Database *sql.DB
+	Router    *gin.Engine
+	Database  *sql.DB
 	JWTSecret string
-	Shutdown chan bool
+	Shutdown  chan bool
 }
 
 type dbInfo struct {
-	status 	string
-	size	string
-	tables	string
+	status string
+	size   string
+	tables string
 }
 
 func startGrpcServer(db *sql.DB, tcpBroadcaster *tcp.ProgressSyncServer) error {
@@ -118,43 +118,44 @@ func preloadGrpcLegacyCache(db *sql.DB, svc *internalgrpc.GrpcService) (int, err
 	}
 	return count, nil
 }
+
 // subcommand "server"
 var ServerCmd = &cobra.Command{
-	Use: "server",
+	Use:   "server",
 	Short: "Manage the MangaHub server components",
 }
 
 // add command "start"
 var startCmd = &cobra.Command{
-	Use: "start",
+	Use:   "start",
 	Short: "Start all of the MangaHub server",
 	Run: func(cmd *cobra.Command, args []string) {
-	httpOnly, _ := cmd.Flags().GetBool("http-only")
-	tcpOnly, _ := cmd.Flags().GetBool("tcp-only")
-	udpOnly, _ := cmd.Flags().GetBool("udp-only")
-	grpcOnly, _ := cmd.Flags().GetBool("grpc-only")
-	wsOnly, _ := cmd.Flags().GetBool("ws-only")
-		
-	anyOnly := httpOnly || tcpOnly || udpOnly || grpcOnly || wsOnly
-	allMode := !anyOnly
+		httpOnly, _ := cmd.Flags().GetBool("http-only")
+		tcpOnly, _ := cmd.Flags().GetBool("tcp-only")
+		udpOnly, _ := cmd.Flags().GetBool("udp-only")
+		grpcOnly, _ := cmd.Flags().GetBool("grpc-only")
+		wsOnly, _ := cmd.Flags().GetBool("ws-only")
 
-	err := godotenv.Load("")
-	if err != nil {
-		log.Println(err)
-	}
-		
-	jwtSecret := os.Getenv("JWTSECRETKEY")
-	fmt.Println("Starting MangaHub Server Components...")
-	
-	home, _ := os.UserHomeDir()
-	mangahubDir := filepath.Join(home, ".mangahub")
-	os.MkdirAll(mangahubDir, 0755) // create dir if it doesn't exist
-	startTime := time.Now().Format(time.RFC3339)
-	os.WriteFile(filepath.Join(mangahubDir, "server_start"), []byte(startTime), 0644)
+		anyOnly := httpOnly || tcpOnly || udpOnly || grpcOnly || wsOnly
+		allMode := !anyOnly
 
-	fmt.Println()
+		err := godotenv.Load("")
+		if err != nil {
+			log.Println(err)
+		}
 
-	var db *sql.DB
+		jwtSecret := os.Getenv("JWTSECRETKEY")
+		fmt.Println("Starting MangaHub Server Components...")
+
+		home, _ := os.UserHomeDir()
+		mangahubDir := filepath.Join(home, ".mangahub")
+		os.MkdirAll(mangahubDir, 0755) // create dir if it doesn't exist
+		startTime := time.Now().Format(time.RFC3339)
+		os.WriteFile(filepath.Join(mangahubDir, "server_start"), []byte(startTime), 0644)
+
+		fmt.Println()
+
+		var db *sql.DB
 		needsDB := allMode || httpOnly || grpcOnly || wsOnly
 		if needsDB {
 			db, err = database.InitDB("./mangahub.db")
@@ -165,6 +166,25 @@ var startCmd = &cobra.Command{
 			err = database.SeedSampleManga(db)
 			if err != nil {
 				log.Println(err)
+			}
+		}
+
+		// ── TCP Sync Server Initialization ────────────────────────────────
+		var tcpSyncServer *tcp.ProgressSyncServer
+		needsTCP := allMode || tcpOnly
+		if needsTCP {
+			fmt.Println("[TCP] Initializing Sync Server")
+			tcpSyncServer = tcp.NewProgressSyncServer("9090")
+			if err := tcpSyncServer.Start(); err != nil {
+				fmt.Println("  ✗ Failed to start TCP Sync Server:", err)
+			} else {
+				fmt.Println("  ✓ Starting on tcp://localhost:9090")
+				fmt.Println("  ✓ Connection pool initialized (max: 100)")
+				fmt.Println("  ✓ Broadcast channels ready")
+				fmt.Println("  ✓ TCP Sync Server ready on :9090")
+				if allMode || httpOnly {
+					controllers.SetTCPServer(tcpSyncServer)
+				}
 			}
 		}
 
@@ -205,7 +225,7 @@ var startCmd = &cobra.Command{
 			}
 
 			// gRPC client init
-			if err := startGrpcServer(db, nil); err != nil {
+			if err := startGrpcServer(db, tcpSyncServer); err != nil {
 				fmt.Println("  ⚠ gRPC service failed:", err)
 			} else {
 				if err := controllers.InitializeGrpcClient("localhost:9092"); err != nil {
@@ -219,28 +239,12 @@ var startCmd = &cobra.Command{
 		}
 
 		// ── [2/5] TCP Sync Server ──────────────────────────────────────────
-		needsTCP := allMode || tcpOnly
-		if needsTCP {
+		if needsTCP && !allMode {
 			fmt.Println()
 			fmt.Println("[2/5] TCP Sync Server")
-
-			tcpServer := tcp.NewProgressSyncServer("9090")
-			if err := tcpServer.Start(); err != nil {
-				fmt.Println("  ✗ Failed to start:", err)
-			} else {
-				fmt.Println("  ✓ Starting on tcp://localhost:9090")
-				fmt.Println("  ✓ Connection pool initialized (max: 100)")
-				fmt.Println("  ✓ Broadcast channels ready")
-				fmt.Println("  Status: Listening for connections")
-				if needsHTTP {
-					controllers.SetTCPServer(tcpServer)
-				}
-			}
-
-			// TCP-only mode blocks here
+			fmt.Println("  ✓ Running on tcp://localhost:9090")
+			fmt.Println("  Status: Listening for connections")
 			if tcpOnly {
-				fmt.Println()
-				fmt.Println("Press Ctrl+C to stop.")
 				select {}
 			}
 		}
@@ -287,7 +291,7 @@ var startCmd = &cobra.Command{
 						return
 					}
 				}
-				if err := startGrpcServer(db, nil); err != nil {
+				if err := startGrpcServer(db, tcpSyncServer); err != nil {
 					fmt.Println("  ✗ Failed to start:", err)
 				} else {
 					fmt.Println("  ✓ Starting on grpc://localhost:9092")
@@ -351,11 +355,21 @@ var startCmd = &cobra.Command{
 		fmt.Println()
 		fmt.Println("─────────────────────────────────────────")
 		fmt.Println("Server URLs:")
-		if needsHTTP  { fmt.Println("  HTTP API:  http://localhost:8080") }
-		if needsTCP   { fmt.Println("  TCP Sync:  tcp://localhost:9090") }
-		if needsUDP   { fmt.Println("  UDP:       udp://localhost:9091") }
-		if needsGRPC  { fmt.Println("  gRPC:      grpc://localhost:9092") }
-		if needsWS    { fmt.Println("  WebSocket: ws://localhost:9093/chat/:room") }
+		if needsHTTP {
+			fmt.Println("  HTTP API:  http://localhost:8080")
+		}
+		if needsTCP {
+			fmt.Println("  TCP Sync:  tcp://localhost:9090")
+		}
+		if needsUDP {
+			fmt.Println("  UDP:       udp://localhost:9091")
+		}
+		if needsGRPC {
+			fmt.Println("  gRPC:      grpc://localhost:9092")
+		}
+		if needsWS {
+			fmt.Println("  WebSocket: ws://localhost:9093/chat/:room")
+		}
 		fmt.Println()
 		fmt.Println("Stop: mangahub server stop")
 		fmt.Println("─────────────────────────────────────────")
@@ -374,11 +388,10 @@ var startCmd = &cobra.Command{
 }
 
 var stopCmd = &cobra.Command{
-	Use: "stop",
+	Use:   "stop",
 	Short: "Stop running all the MangaHub servers",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Stopping all servers...")
-
 
 		// send POST request to server to shut down
 		client := http.Client{}
@@ -401,7 +414,7 @@ var stopCmd = &cobra.Command{
 			fmt.Println("✅ Server shutdown successfully.")
 			os.Remove(".session")
 			os.Remove(".token")
-			
+
 			home, _ := os.UserHomeDir()
 			os.Remove(filepath.Join(home, ".mangahub", "server_start"))
 		} else {
@@ -410,9 +423,8 @@ var stopCmd = &cobra.Command{
 	},
 }
 
-
 var statusCmd = &cobra.Command{
-	Use: "status",
+	Use:   "status",
 	Short: "Check status of all server running",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("MangaHub Server Status")
@@ -447,7 +459,7 @@ var statusCmd = &cobra.Command{
 		wsStatus, wsLoad := probeTCP("9093")
 		printServiceRow("WebSocket Chat", wsStatus, "localhost:9093", startTime, wsLoad)
 
-		// Overall health 
+		// Overall health
 		allOnline := httpStatus == "online" &&
 			tcpStatus == "online" &&
 			udpStatus == "online" &&
@@ -476,7 +488,7 @@ var statusCmd = &cobra.Command{
 			if wsStatus != "online" {
 				fmt.Println("  ✗ WebSocket Chat: Not reachable on port 9093")
 			}
-		}		
+		}
 
 		// Database
 		fmt.Println()
@@ -487,15 +499,14 @@ var statusCmd = &cobra.Command{
 		fmt.Printf("  Size:			%s\n", dbInfo.size)
 		fmt.Printf("  Tables:		%s\n", dbInfo.tables)
 
-
 		// System
 		fmt.Println()
-		fmt.Printf("Checked at: %s\n", time.Now().Format("2006-01-02 15:04:05"))	
+		fmt.Printf("Checked at: %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	},
 }
 
 var healthCmd = &cobra.Command{
-	Use: "health",
+	Use:   "health",
 	Short: "Check server health",
 	Run: func(cmd *cobra.Command, args []string) {
 		client := &http.Client{}
@@ -518,10 +529,10 @@ var healthCmd = &cobra.Command{
 func getServerStartTime() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-        return ""
-    }
-	
-    data, err := os.ReadFile(filepath.Join(home, ".mangahub", "server_start"))
+		return ""
+	}
+
+	data, err := os.ReadFile(filepath.Join(home, ".mangahub", "server_start"))
 	if err != nil {
 		return ""
 	}
@@ -567,10 +578,9 @@ func probeHTTP() (string, string) {
 	return "online", "HTTP active"
 }
 
-
 // check if a TCP Port is open
 func probeTCP(port string) (string, string) {
-	conn, err := net.DialTimeout("tcp", "localhost:"+port, 2 * time.Second)
+	conn, err := net.DialTimeout("tcp", "localhost:"+port, 2*time.Second)
 	if err != nil {
 		return "✗ Offline", "─"
 	}
@@ -580,7 +590,7 @@ func probeTCP(port string) (string, string) {
 
 // sends a ping packet and waits for pong
 func probeUDP(port string) (string, string) {
-	addr, err := net.ResolveUDPAddr("udp", "localhost:" + port)
+	addr, err := net.ResolveUDPAddr("udp", "localhost:"+port)
 	if err != nil {
 		return "✗ Offline", "─"
 	}
@@ -617,10 +627,10 @@ func probeDatabaseInfo() dbInfo {
 		return dbInfo{
 			status: "✗ Not found",
 			size:   "─",
-			tables: "─",		
+			tables: "─",
 		}
 	}
-	
+
 	sizeMB := float64(info.Size()) / (1024 * 1024)
 	sizeStr := fmt.Sprintf("%.1f MB", sizeMB)
 
@@ -643,7 +653,7 @@ func probeDatabaseInfo() dbInfo {
 			status: "✓ Active",
 			size:   sizeStr,
 			tables: "─",
-		}	
+		}
 	}
 
 	defer rows.Close()
@@ -664,10 +674,9 @@ func probeDatabaseInfo() dbInfo {
 	}
 }
 
-
 func init() {
 	// Add start command to the server command
-	ServerCmd.AddCommand(startCmd) 
+	ServerCmd.AddCommand(startCmd)
 
 	// Add stop command to the server command
 	ServerCmd.AddCommand(stopCmd)

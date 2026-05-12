@@ -10,55 +10,51 @@ import (
 	"time"
 )
 
-
 type ProgressUpdate struct {
 	UserID    string `json:"user_id"`
 	Username  string `json:"username"`
 	MangaID   string `json:"manga_id"`
 	Chapter   int    `json:"chapter"`
 	Timestamp int64  `json:"timestamp"`
-	Device	  string `json:"device"`
+	Device    string `json:"device"`
 	SessionID string `json:"session_id"`
 }
 
 type Client struct {
-	Conn 		net.Conn
-	UserID 		string
-	Username 	string
-	Device 		string
-	SessionID 	string
+	Conn      net.Conn
+	UserID    string
+	Username  string
+	Device    string
+	SessionID string
 }
 
-
 type ProgressSyncServer struct {
-	Port 		string
-	clients 	map[string]*Client
-	mu			sync.RWMutex
-	Broadcast 	chan ProgressUpdate
-	Register	chan *Client
-	Unregister	chan string
-	quit		chan bool
+	Port       string
+	clients    map[string]*Client
+	mu         sync.RWMutex
+	Broadcast  chan ProgressUpdate
+	Register   chan *Client
+	Unregister chan string
+	quit       chan bool
 }
 
 type RegisterMessage struct {
-	UserID   string `json:"user_id"`
-	Username string `json:"username"`
-	Device   string `json:"device"`
-	SessionID string `json:"session_id"` 
+	UserID    string `json:"user_id"`
+	Username  string `json:"username"`
+	Device    string `json:"device"`
+	SessionID string `json:"session_id"`
 }
-
 
 func NewProgressSyncServer(port string) *ProgressSyncServer {
-	return &ProgressSyncServer {
-		Port: 		port,
-		clients: 	make(map[string]*Client),
-		Broadcast:	make(chan ProgressUpdate, 100),
-		Register:	make(chan *Client),
+	return &ProgressSyncServer{
+		Port:       port,
+		clients:    make(map[string]*Client),
+		Broadcast:  make(chan ProgressUpdate, 100),
+		Register:   make(chan *Client),
 		Unregister: make(chan string),
-		quit:		make(chan bool),			
+		quit:       make(chan bool),
 	}
 }
-
 
 func (s *ProgressSyncServer) Start() error {
 	listener, err := net.Listen("tcp", ":"+s.Port)
@@ -71,7 +67,6 @@ func (s *ProgressSyncServer) Start() error {
 	// run the hub (handle register/unregister/broadcast)
 	go s.runHub()
 
-
 	// accept incoming connections
 	go func() {
 		defer listener.Close()
@@ -79,7 +74,7 @@ func (s *ProgressSyncServer) Start() error {
 			conn, err := listener.Accept()
 			if err != nil {
 				select {
-				case <- s.quit:
+				case <-s.quit:
 					return
 				default:
 					log.Println("[TCP] Accept error:", err)
@@ -138,23 +133,22 @@ func (s *ProgressSyncServer) runHub() {
 }
 
 // manages a single tcp connection lifecycle
-func(s *ProgressSyncServer) handleClient(conn net.Conn) {
+func (s *ProgressSyncServer) handleClient(conn net.Conn) {
 	defer conn.Close()
 
-	log.Println("[TCP] New connection from:", conn.RemoteAddr()) 
-
+	log.Println("[TCP] New connection from:", conn.RemoteAddr())
 
 	// scanner reads line by line (\n)
 	scanner := bufio.NewScanner(conn)
-	
-	log.Println("[TCP] Waiting for registration message...") 
-	
+
+	log.Println("[TCP] Waiting for registration message...")
+
 	// read registeration message in the first line
 	if !scanner.Scan() {
 		log.Println("[TCP] Client disconnected before registration")
 		return
 	}
-	
+
 	var reg RegisterMessage
 	if err := json.Unmarshal(scanner.Bytes(), &reg); err != nil {
 		log.Println("[TCP] Failed to parse registration:", err)
@@ -162,14 +156,14 @@ func(s *ProgressSyncServer) handleClient(conn net.Conn) {
 		return
 	}
 
-	log.Println("[TCP] Registered:", reg.Username, reg.Device)	
+	log.Println("[TCP] Registered:", reg.Username, reg.Device)
 
 	// create client placeholder
 	client := &Client{
-		Conn: conn,
-		UserID: reg.UserID,
-		Username: reg.Username,
-		Device: reg.Device,
+		Conn:      conn,
+		UserID:    reg.UserID,
+		Username:  reg.Username,
+		Device:    reg.Device,
 		SessionID: reg.SessionID,
 	}
 	// register client
@@ -188,9 +182,8 @@ func(s *ProgressSyncServer) handleClient(conn net.Conn) {
 	ackData = append(ackData, '\n')
 	conn.Write(ackData)
 
-
 	// listen for progress update from this client
-	for scanner.Scan(){
+	for scanner.Scan() {
 		var update ProgressUpdate
 		if err := json.Unmarshal(scanner.Bytes(), &update); err != nil {
 			// client disconnected
@@ -205,7 +198,7 @@ func(s *ProgressSyncServer) handleClient(conn net.Conn) {
 
 		log.Printf("[TCP] Progress update from %s: %s → ch.%d\n",
 			client.Username, update.MangaID, update.Chapter)
-		
+
 		// Broadcast to all other connected clients about manga progress update
 		s.Broadcast <- update
 	}
@@ -213,6 +206,9 @@ func(s *ProgressSyncServer) handleClient(conn net.Conn) {
 
 // called by HTTP controller to notify TCP clients
 func (s *ProgressSyncServer) BroadcastUpdate(update ProgressUpdate) {
+	if s == nil {
+		return
+	}
 	select {
 	case s.Broadcast <- update:
 	default:
@@ -220,13 +216,12 @@ func (s *ProgressSyncServer) BroadcastUpdate(update ProgressUpdate) {
 	}
 }
 
-
 // returns number of connected clients
-func(s *ProgressSyncServer) ConnectedCount() int {
+func (s *ProgressSyncServer) ConnectedCount() int {
+	if s == nil {
+		return 0
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return len(s.clients)
 }
-
-
-// 
