@@ -19,6 +19,7 @@ A manga tracking system implemented using 5 core network protocols: HTTP, TCP, U
   - [Progress Tracking](#progress-tracking)
   - [Network Protocol Features](#network-protocol-features)
   - [Chat System](#chat-system)
+- [API References](#api-reference)
 - [Project Structure](#project-structure)
 - [Tech Stack](#tech-stack)
 
@@ -262,6 +263,75 @@ mangahub chat history --manga-id one-piece --limit 50
 | `/manga <id>` | Switch to a manga chat room |
 | `/history` | Show recent messages |
 | `/quit` | Leave the chat |
+
+
+## API Reference
+
+REST API runs on `http://localhost:8080`.
+
+### 1. Authentication
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/auth/register` | Public | Register a new user |
+| `POST` | `/auth/login` | Public | Login and receive JWT |
+| `POST` | `/auth/logout` | Protected | Invalidate current session |
+| `GET` | `/auth/check` | Protected | Verify token and get user info |
+| `PUT` | `/auth/change-password` | Protected | Update user password |
+
+### 2. Manga Discovery
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/manga/` | Public | List/Search all manga |
+| `GET` | `/manga/:id` | Public | Get specific manga details |
+
+### 3. User Library & Progress
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/users/library` | Protected | View user's manga library |
+| `POST` | `/users/library` | Protected | Add a manga to library |
+| `PUT` | `/users/library/:id` | Protected | Update status/rating |
+| `DELETE` | `/users/library/:id` | Protected | Remove manga from library |
+| `PUT` | `/users/progress` | Protected | Update reading progress (chapter) |
+| `GET` | `/users/progress/history` | Protected | View reading history |
+| `POST` | `/users/progress/sync` | Protected | Trigger manual progress sync |
+| `GET` | `/users/progress/sync-status` | Protected | Check last sync details |
+
+### 4. Statistics & Export
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/users/stats/overview` | Protected | General reading statistics |
+| `GET` | `/users/stats/detailed` | Protected | Advanced analytics |
+| `GET` | `/users/export/library` | Protected | Export library data |
+| `GET` | `/users/export/progress` | Protected | Export progress data |
+
+### 5. Notifications
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/notify/subscribe` | Protected | Enable notifications for a manga |
+| `POST` | `/notify/unsubscribe` | Protected | Disable notifications |
+| `GET` | `/notify/preferences` | Protected | View notification settings |
+| `POST` | `/notify/test` | Protected | Send a test UDP notification |
+| `POST` | `/notify/new-chapter` | Protected | Broadcast new chapter (Admin) |
+
+### 6. gRPC Proxy Services
+*These endpoints interface with the internal gRPC Manga Service.*
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/grpc/manga/list` | Protected | List manga via gRPC |
+| `GET` | `/grpc/manga/search` | Protected | Search manga via gRPC |
+| `GET` | `/grpc/manga/:id` | Protected | Get manga info via gRPC |
+| `POST` | `/grpc/manga/batch` | Protected | Fetch multiple manga records |
+| `POST` | `/grpc/progress/update`| Protected | Update progress via gRPC |
+| `GET` | `/grpc/stats` | Protected | Get gRPC service health/stats |
+
+### 7. Real-time & System
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/chat/history` | Protected | Fetch chat message logs |
+| `WS` | `/chat/:room` | Protected | WebSocket connection for live chat |
+| `GET` | `/server/health` | Public | Check API & DB health |
+| `POST` | `/server/stop` | Protected | Remote server shutdown |
+
 
 ## Project Structure
 
