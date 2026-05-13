@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -70,13 +71,13 @@ func (s *Server) GetManga(ctx context.Context, req *grpcpb.GetMangaRequest) (*gr
 	_ = json.Unmarshal([]byte(genresJSON), &genres)
 
 	return &grpcpb.MangaResponse{
-		Id:           mangaID,
-		Title:        title,
-		Author:       author,
-		Artist:       artist,
-		Genres:       genres,
-		Status:       status,
-		Year:         int32(year),
+		Id:            mangaID,
+		Title:         title,
+		Author:        author,
+		Artist:        artist,
+		Genres:        genres,
+		Status:        status,
+		Year:          int32(year),
 		TotalChapters: int32(totalChapters),
 		TotalVolumes:  int32(totalVolumes),
 		Publisher:     publisher,
@@ -150,11 +151,16 @@ func (s *Server) UpdateProgress(ctx context.Context, req *grpcpb.ProgressRequest
 	chapter := int(req.GetChapter())
 	status := strings.TrimSpace(req.GetStatus())
 
+	log.Printf("gRPC UpdateProgress: User=%s, Manga=%s, Ch=%d", userID, mangaID, chapter)
+
 	if userID == "" || mangaID == "" || chapter < 1 {
 		return nil, fmt.Errorf("user_id, manga_id, and chapter (>=1) are required")
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
+
+	var prevChapter int
+	_ = s.db.QueryRowContext(ctx, "SELECT current_chapter FROM user_progress WHERE user_id = ? AND manga_id = ?", userID, mangaID).Scan(&prevChapter)
 
 	// Ensure record exists / update.
 	// Note: schema in this repo includes rating/started_reading columns, so we preserve those if present.
@@ -169,6 +175,12 @@ func (s *Server) UpdateProgress(ctx context.Context, req *grpcpb.ProgressRequest
 	if err != nil {
 		return nil, err
 	}
+
+	_, err = s.db.ExecContext(ctx, `
+		INSERT INTO progress_history (user_id, manga_id, previous_chapter, current_chapter, updated_at)
+		VALUES (?, ?, ?, ?, ?)
+	`, userID, mangaID, prevChapter, chapter, now)
+	log.Printf("History logged: from %d to %d", prevChapter, chapter)
 
 	// Broadcast via TCP sync server (UC-016 step 4)
 	if s.tcp != nil {
@@ -188,4 +200,3 @@ func (s *Server) UpdateProgress(ctx context.Context, req *grpcpb.ProgressRequest
 		UpdatedAt:     now,
 	}, nil
 }
-
